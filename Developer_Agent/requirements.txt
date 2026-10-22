@@ -1,0 +1,13 @@
+langchain-google-genai
+langchain-core
+langgraph
+pydantic
+python-dotenv
+langchain-chroma
+langchain-text-splitters
+fastapi
+uvicorn
+
+# tests
+pytest
+httpx

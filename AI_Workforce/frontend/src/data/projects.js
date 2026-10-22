@@ -1,0 +1,61 @@
+export const projects = [
+  {
+    id: 1,
+    name: 'E-Commerce Platform',
+    manager: 'John Doe',
+    progress: 75,
+    status: 'In Progress',
+    createdOn: 'May 15, 2025',
+    description: 'A comprehensive e-commerce platform with payment integration',
+    startDate: 'May 1, 2025',
+    dueDate: 'August 30, 2025',
+  },
+  {
+    id: 2,
+    name: 'AI Chat Assistant',
+    manager: 'Sarah Wilson',
+    progress: 52,
+    status: 'In Progress',
+    createdOn: 'May 18, 2025',
+    description: 'Intelligent chatbot with NLP capabilities',
+    startDate: 'May 10, 2025',
+    dueDate: 'September 15, 2025',
+  },
+  {
+    id: 3,
+    name: 'Inventory Management',
+    manager: 'Mike Johnson',
+    progress: 30,
+    status: 'Planning',
+    createdOn: 'May 20, 2025',
+    description: 'Real-time inventory tracking system',
+    startDate: 'June 1, 2025',
+    dueDate: 'October 31, 2025',
+  },
+  {
+    id: 4,
+    name: 'HR Management System',
+    manager: 'Emily Brown',
+    progress: 90,
+    status: 'In Progress',
+    createdOn: 'April 10, 2025',
+    description: 'Complete HR automation solution',
+    startDate: 'April 1, 2025',
+    dueDate: 'July 15, 2025',
+  },
+  {
+    id: 5,
+    name: 'Bug Tracking System',
+    manager: 'Alex Chen',
+    progress: 100,
+    status: 'Completed',
+    createdOn: 'March 5, 2025',
+    description: 'Issue and bug tracking platform',
+    startDate: 'March 1, 2025',
+    dueDate: 'May 31, 2025',
+  },
+]
+
+export const getProjectById = (id) => {
+  return projects.find(p => p.id === parseInt(id))
+}

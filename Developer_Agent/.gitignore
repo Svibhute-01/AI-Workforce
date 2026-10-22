@@ -1,0 +1,11 @@
+.env
+.venv/
+venv/
+__pycache__/
+*.pyc
+vectorstore/*
+workspaces/*
+!vectorstore/.gitkeep
+!workspaces/.gitkeep
+jobs/*
+!jobs/.gitkeep

@@ -1,0 +1,138 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #f8f7ff;
+  color: #1a1a1a;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f3e8ff;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #5B2DD8;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #4b1fa8;
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark transition-colors font-medium;
+  }
+
+  .btn-secondary {
+    @apply bg-gray-200 text-text-primary px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors font-medium;
+  }
+
+  .btn-outline {
+    @apply border-2 border-primary text-primary px-4 py-2 rounded-lg hover:bg-primary-light transition-colors font-medium;
+  }
+
+  .card {
+    @apply bg-card-bg rounded-lg border border-border-light shadow-sm;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-2 border border-border-light rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent;
+  }
+
+  .table-header {
+    @apply bg-gray-50 border-b border-border-light font-medium text-text-secondary text-sm;
+  }
+
+  .badge {
+    @apply px-3 py-1 rounded-full text-xs font-medium;
+  }
+
+  .badge-success {
+    @apply bg-green-100 text-green-800;
+  }
+
+  .badge-warning {
+    @apply bg-yellow-100 text-yellow-800;
+  }
+
+  .badge-danger {
+    @apply bg-red-100 text-red-800;
+  }
+
+  .badge-info {
+    @apply bg-blue-100 text-blue-800;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Dark theme. Purely additive: every rule is scoped to html[data-theme='dark'],
+   so light mode is unchanged. Toggled from Settings > Appearance.
+   --------------------------------------------------------------------------- */
+html[data-theme='dark'] { color-scheme: dark; }
+html[data-theme='dark'] body { background-color: #0f0d1a; color: #ece9fb; }
+
+html[data-theme='dark'] .bg-white,
+html[data-theme='dark'] .bg-card-bg,
+html[data-theme='dark'] .card { background-color: #1a1730; }
+html[data-theme='dark'] .bg-bg-light { background-color: #0f0d1a; }
+html[data-theme='dark'] .bg-gray-50,
+html[data-theme='dark'] .hover\:bg-gray-50:hover,
+html[data-theme='dark'] .table-header { background-color: #221e3d; }
+html[data-theme='dark'] .bg-gray-100 { background-color: #2a2548; }
+html[data-theme='dark'] .bg-gray-200,
+html[data-theme='dark'] .btn-secondary { background-color: #332d57; }
+html[data-theme='dark'] .btn-secondary { color: #f1effc; }
+html[data-theme='dark'] .btn-secondary:hover { background-color: #3d3668; }
+html[data-theme='dark'] .bg-primary-light,
+html[data-theme='dark'] .bg-purple-100 { background-color: #2b2152; }
+
+html[data-theme='dark'] .text-text-primary { color: #f1effc; }
+html[data-theme='dark'] .text-text-secondary { color: #a8a4c4; }
+html[data-theme='dark'] .text-primary { color: #b79bff; }
+html[data-theme='dark'] .border-border-light,
+html[data-theme='dark'] .border-gray-200 { border-color: #2d2850; }
+
+html[data-theme='dark'] .input-field,
+html[data-theme='dark'] input,
+html[data-theme='dark'] select,
+html[data-theme='dark'] textarea { background-color: #221e3d; color: #f1effc; }
+html[data-theme='dark'] input::placeholder,
+html[data-theme='dark'] textarea::placeholder { color: #7f7ba0; }
+
+html[data-theme='dark'] .badge-success,
+html[data-theme='dark'] .bg-green-100 { background-color: #12372b; color: #6ee7b7; }
+html[data-theme='dark'] .badge-warning,
+html[data-theme='dark'] .bg-yellow-100 { background-color: #3d3210; color: #fcd34d; }
+html[data-theme='dark'] .badge-danger,
+html[data-theme='dark'] .bg-red-100 { background-color: #3f1d24; color: #fca5a5; }
+html[data-theme='dark'] .badge-info,
+html[data-theme='dark'] .bg-blue-100 { background-color: #142a4a; color: #93c5fd; }
+
+html[data-theme='dark'] .bg-red-50 { background-color: #2e1720; }
+html[data-theme='dark'] .border-red-200 { border-color: #5b2230; }
+html[data-theme='dark'] .text-red-700,
+html[data-theme='dark'] .text-red-800 { color: #fca5a5; }
+html[data-theme='dark'] .bg-yellow-50 { background-color: #2e2810; }
+html[data-theme='dark'] .border-yellow-200 { border-color: #5b4a14; }
+html[data-theme='dark'] .text-yellow-800 { color: #fcd34d; }
+html[data-theme='dark'] .bg-green-50 { background-color: #10281f; }
+html[data-theme='dark'] .text-green-800 { color: #6ee7b7; }
+html[data-theme='dark'] .text-green-600 { color: #4ade80; }
+html[data-theme='dark'] .text-blue-800 { color: #93c5fd; }

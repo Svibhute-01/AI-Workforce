@@ -1,0 +1,23 @@
+{
+  "name": "workspace",
+  "version": "1.0.0",
+  "description": "Multi-agent AI platform for intelligent SDLC automation",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@vitejs/plugin-react": "^4.7.0",
+    "autoprefixer": "^10.6.1",
+    "lucide-react": "^0.263.1",
+    "postcss": "^8.5.28",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.30.6",
+    "tailwindcss": "^3.4.19",
+    "vite": "^4.5.14"
+  }
+}

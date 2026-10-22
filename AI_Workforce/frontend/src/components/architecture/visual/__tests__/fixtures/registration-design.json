@@ -1,0 +1,700 @@
+{
+ "hld": {
+  "overview": "A web application that lets customers register with an email and password and receive a confirmation email.",
+  "style": {
+   "grounding": "ASSUMED",
+   "requirement_ids": [],
+   "task_ids": [],
+   "rationale": "The SRS does not choose a style; a single service is enough for one registration flow.",
+   "name": "Layered monolith",
+   "description": "One deployable backend with controller, service and repository layers, plus a React client."
+  },
+  "system_architecture": "The browser client calls the registration API; the API validates input, stores the account in the database and asks the email provider to send the confirmation.",
+  "actors": [
+   {
+    "grounding": "EXPLICIT",
+    "requirement_ids": [
+     "REQ-1"
+    ],
+    "task_ids": [],
+    "rationale": null,
+    "actor_id": "A1",
+    "name": "Customer",
+    "description": "A person who registers for an account.",
+    "interaction": "Registers through the web form",
+    "component_ids": [
+     "C1"
+    ]
+   }
+  ],
+  "components": [
+   {
+    "grounding": "EXPLICIT",
+    "requirement_ids": [
+     "REQ-1",
+     "REQ-7"
+    ],
+    "task_ids": [
+     "T4"
+    ],
+    "rationale": null,
+    "component_id": "C1",
+    "name": "Web Client",
+    "type": "FRONTEND",
+    "description": "Registration form.",
+    "responsibilities": [
+     "Collect email and password",
+     "Show the registration result"
+    ],
+    "technology": "React"
+   },
+   {
+    "grounding": "EXPLICIT",
+    "requirement_ids": [
+     "REQ-2",
+     "REQ-3",
+     "REQ-4",
+     "REQ-5"
+    ],
+    "task_ids": [
+     "T4",
+     "T5"
+    ],
+    "rationale": null,
+    "component_id": "C2",
+    "name": "Registration API",
+    "type": "API",
+    "description": "Validates input and creates accounts.",
+    "responsibilities": [
+     "Validate email and password",
+     "Reject duplicate emails",
+     "Create the account",
+     "Trigger confirmation email"
+    ],
+    "technology": "FastAPI"
+   },
+   {
+    "grounding": "ASSUMED",
+    "requirement_ids": [
+     "REQ-4"
+    ],
+    "task_ids": [
+     "T2"
+    ],
+    "rationale": "PostgreSQL is the project's existing database; the SRS names none.",
+    "component_id": "C3",
+    "name": "Account Database",
+    "type": "DATABASE",
+    "description": "Stores customer accounts.",
+    "responsibilities": [
+     "Persist accounts",
+     "Enforce unique email"
+    ],
+    "technology": "PostgreSQL"
+   },
+   {
+    "grounding": "EXPLICIT",
+    "requirement_ids": [
+     "REQ-6"
+    ],
+    "task_ids": [],
+    "rationale": null,
+    "component_id": "C4",
+    "name": "Email Provider",
+    "type": "EXTERNAL_SYSTEM",
+    "description": "Delivers confirmation emails.",
+    "responsibilities": [
+     "Deliver the confirmation email"
+    ],
+    "technology": null
+   }
+  ],
+  "relationships": [
+   {
+    "relationship_id": "R1",
+    "source_component_id": "C1",
+    "target_component_id": "C2",
+    "interaction": "HTTP",
+    "description": "Submits registration requests",
+    "data_exchanged": "email, password",
+    "protocol": "HTTPS/JSON"
+   },
+   {
+    "relationship_id": "R2",
+    "source_component_id": "C2",
+    "target_component_id": "C3",
+    "interaction": "DATABASE",
+    "description": "Reads and writes accounts",
+    "data_exchanged": "account records",
+    "protocol": "SQL"
+   },
+   {
+    "relationship_id": "R3",
+    "source_component_id": "C2",
+    "target_component_id": "C4",
+    "interaction": "HTTP",
+    "description": "Requests the confirmation email",
+    "data_exchanged": "recipient address",
+    "protocol": "HTTPS"
+   }
+  ],
+  "data_flows": [
+   {
+    "grounding": "EXPLICIT",
+    "requirement_ids": [
+     "REQ-5",
+     "REQ-6"
+    ],
+    "task_ids": [
+     "T4"
+    ],
+    "rationale": null,
+    "flow_id": "DF1",
+    "name": "Register a customer",
+    "description": "From form submission to confirmation.",
+    "steps": [
+     {
+      "order": 1,
+      "source_component_id": "C1",
+      "target_component_id": "C2",
+      "description": "Submit email and password"
+     },
+     {
+      "order": 2,
+      "source_component_id": "C2",
+      "target_component_id": "C3",
+      "description": "Check for an existing account and create one"
+     },
+     {
+      "order": 3,
+      "source_component_id": "C2",
+      "target_component_id": "C4",
+      "description": "Request the confirmation email"
+     }
+    ]
+   }
+  ],
+  "integrations": [
+   {
+    "grounding": "EXPLICIT",
+    "requirement_ids": [
+     "REQ-6"
+    ],
+    "task_ids": [],
+    "rationale": null,
+    "integration_id": "INT1",
+    "name": "Email delivery",
+    "purpose": "Send the confirmation email.",
+    "component_id": "C2",
+    "protocol": "HTTPS"
+   }
+  ],
+  "deployment": [
+   {
+    "grounding": "ASSUMED",
+    "requirement_ids": [],
+    "task_ids": [],
+    "rationale": "A web client implies the customer's browser; the SRS does not say more.",
+    "node_id": "DN1",
+    "name": "Customer browser",
+    "kind": "CLIENT_DEVICE",
+    "description": "Runs the registration page.",
+    "technology": "Web browser",
+    "component_ids": [
+     "C1"
+    ]
+   },
+   {
+    "grounding": "ASSUMED",
+    "requirement_ids": [],
+    "task_ids": [],
+    "rationale": "The SRS does not describe hosting; one container keeps deployment simple.",
+    "node_id": "DN2",
+    "name": "API container",
+    "kind": "CONTAINER",
+    "description": "Runs the registration API.",
+    "technology": "Docker",
+    "component_ids": [
+     "C2"
+    ]
+   },
+   {
+    "grounding": "ASSUMED",
+    "requirement_ids": [],
+    "task_ids": [],
+    "rationale": "PostgreSQL is the project's existing database; hosting is not specified.",
+    "node_id": "DN3",
+    "name": "Database server",
+    "kind": "SERVER",
+    "description": "Hosts the account database.",
+    "technology": "PostgreSQL server",
+    "component_ids": [
+     "C3"
+    ]
+   }
+  ],
+  "decisions": [
+   {
+    "grounding": "ASSUMED",
+    "requirement_ids": [],
+    "task_ids": [],
+    "rationale": "Matches the existing project stack; the SRS names no framework.",
+    "decision_id": "D1",
+    "area": "Backend framework",
+    "decision": "Use FastAPI.",
+    "alternatives_considered": [
+     "Django"
+    ],
+    "tradeoffs": "Fast to build; fewer batteries than Django."
+   }
+  ],
+  "quality_considerations": [
+   {
+    "grounding": "UNKNOWN",
+    "requirement_ids": [],
+    "task_ids": [],
+    "rationale": "Sign-in is not part of these requirements.",
+    "consideration_id": "Q1",
+    "category": "AUTHENTICATION_AUTHORIZATION",
+    "title": "No sign-in in scope",
+    "approach": "The SRS covers registration only; login and authorization are not specified."
+   },
+   {
+    "grounding": "INFERRED",
+    "requirement_ids": [
+     "NFR-1"
+    ],
+    "task_ids": [],
+    "rationale": "Supports the two-second target under load.",
+    "consideration_id": "Q2",
+    "category": "SCALABILITY",
+    "title": "Stateless API",
+    "approach": "Keep the API stateless so more instances can be added behind a load balancer."
+   },
+   {
+    "grounding": "EXPLICIT",
+    "requirement_ids": [
+     "NFR-3"
+    ],
+    "task_ids": [],
+    "rationale": null,
+    "consideration_id": "Q3",
+    "category": "RELIABILITY",
+    "title": "Honest email status",
+    "approach": "Report an email failure instead of claiming delivery."
+   },
+   {
+    "grounding": "EXPLICIT",
+    "requirement_ids": [
+     "NFR-2"
+    ],
+    "task_ids": [],
+    "rationale": null,
+    "consideration_id": "Q4",
+    "category": "SECURITY",
+    "title": "Hash passwords",
+    "approach": "Store only salted password hashes."
+   },
+   {
+    "grounding": "ASSUMED",
+    "requirement_ids": [],
+    "task_ids": [],
+    "rationale": "The SRS does not describe deployment.",
+    "consideration_id": "Q5",
+    "category": "DEPLOYMENT",
+    "title": "Single deployable",
+    "approach": "Deploy the API and client as two containers."
+   }
+  ],
+  "risks": [
+   {
+    "risk_id": "AR1",
+    "title": "Email provider outage",
+    "description": "Confirmation emails fail.",
+    "impact": "MEDIUM",
+    "likelihood": "MEDIUM",
+    "mitigation": "Surface the failure and allow a resend.",
+    "component_ids": [
+     "C4"
+    ],
+    "requirement_ids": [
+     "REQ-6"
+    ]
+   }
+  ],
+  "open_items": [
+   {
+    "item_id": "OH1",
+    "kind": "ASSUMED",
+    "statement": "PostgreSQL and FastAPI are used.",
+    "impact": "Changing them affects the persistence and API layers.",
+    "requirement_ids": []
+   },
+   {
+    "item_id": "OH2",
+    "kind": "UNKNOWN",
+    "statement": "Sign-in behaviour is not specified.",
+    "impact": "No authorization design is possible yet.",
+    "requirement_ids": []
+   }
+  ]
+ },
+ "lld": {
+  "modules": [
+   {
+    "grounding": "EXPLICIT",
+    "requirement_ids": [
+     "REQ-1",
+     "REQ-7"
+    ],
+    "task_ids": [
+     "T4"
+    ],
+    "rationale": null,
+    "module_id": "M1",
+    "component_id": "C2",
+    "name": "RegistrationController",
+    "kind": "CONTROLLER",
+    "description": "HTTP entry point for registration.",
+    "responsibilities": [
+     "Parse the request",
+     "Return the result"
+    ],
+    "methods": [
+     {
+      "name": "register",
+      "signature": "register(request: RegisterRequest) -> RegisterResponse",
+      "description": "Handle POST /register"
+     }
+    ],
+    "depends_on_module_ids": [
+     "M2"
+    ]
+   },
+   {
+    "grounding": "EXPLICIT",
+    "requirement_ids": [
+     "REQ-2",
+     "REQ-3",
+     "REQ-4",
+     "REQ-5",
+     "REQ-6"
+    ],
+    "task_ids": [
+     "T4",
+     "T5"
+    ],
+    "rationale": null,
+    "module_id": "M2",
+    "component_id": "C2",
+    "name": "RegistrationService",
+    "kind": "SERVICE",
+    "description": "Registration business logic.",
+    "responsibilities": [
+     "Validate input",
+     "Reject duplicates",
+     "Create accounts",
+     "Send confirmation"
+    ],
+    "methods": [
+     {
+      "name": "register",
+      "signature": "register(email: str, password: str) -> Account",
+      "description": "Create an account"
+     }
+    ],
+    "depends_on_module_ids": [
+     "M3"
+    ]
+   },
+   {
+    "grounding": "INFERRED",
+    "requirement_ids": [
+     "REQ-4"
+    ],
+    "task_ids": [
+     "T2"
+    ],
+    "rationale": "Needed to look up existing emails.",
+    "module_id": "M3",
+    "component_id": "C2",
+    "name": "AccountRepository",
+    "kind": "REPOSITORY",
+    "description": "Account persistence.",
+    "responsibilities": [
+     "Find an account by email",
+     "Insert an account"
+    ],
+    "methods": [],
+    "depends_on_module_ids": []
+   }
+  ],
+  "interfaces": [
+   {
+    "interface_id": "I1",
+    "name": "AccountStore",
+    "description": "Account persistence contract.",
+    "methods": [
+     {
+      "name": "find_by_email",
+      "signature": "find_by_email(email: str) -> Account | None",
+      "description": "Look up an account"
+     }
+    ],
+    "implemented_by_module_ids": [
+     "M3"
+    ]
+   }
+  ],
+  "apis": [
+   {
+    "grounding": "EXPLICIT",
+    "requirement_ids": [
+     "REQ-1",
+     "REQ-4"
+    ],
+    "task_ids": [
+     "T4"
+    ],
+    "rationale": null,
+    "api_id": "API1",
+    "component_id": "C2",
+    "module_id": "M1",
+    "method": "POST",
+    "path": "/api/register",
+    "summary": "Register a customer",
+    "auth_required": false,
+    "request_model_id": "DM1",
+    "response_model_id": "DM2",
+    "errors": [
+     {
+      "status_code": 409,
+      "condition": "Email already registered"
+     },
+     {
+      "status_code": 422,
+      "condition": "Invalid email or missing password"
+     }
+    ],
+    "validation_rules": [
+     "email must be valid",
+     "password is required"
+    ]
+   }
+  ],
+  "data_models": [
+   {
+    "grounding": "EXPLICIT",
+    "requirement_ids": [
+     "REQ-2",
+     "REQ-3"
+    ],
+    "task_ids": [],
+    "rationale": null,
+    "data_model_id": "DM1",
+    "name": "RegisterRequest",
+    "kind": "REQUEST",
+    "description": "Registration input.",
+    "fields": [
+     {
+      "name": "email",
+      "type": "string",
+      "required": true,
+      "description": null,
+      "validation": "valid email format"
+     },
+     {
+      "name": "password",
+      "type": "string",
+      "required": true,
+      "description": null,
+      "validation": "non-empty"
+     }
+    ]
+   },
+   {
+    "grounding": "EXPLICIT",
+    "requirement_ids": [
+     "REQ-7"
+    ],
+    "task_ids": [],
+    "rationale": null,
+    "data_model_id": "DM2",
+    "name": "RegisterResponse",
+    "kind": "RESPONSE",
+    "description": "Registration result.",
+    "fields": [
+     {
+      "name": "success",
+      "type": "boolean",
+      "required": true,
+      "description": null,
+      "validation": null
+     }
+    ]
+   }
+  ],
+  "tables": [
+   {
+    "grounding": "EXPLICIT",
+    "requirement_ids": [
+     "REQ-4",
+     "REQ-5",
+     "NFR-2"
+    ],
+    "task_ids": [
+     "T2"
+    ],
+    "rationale": null,
+    "table_id": "TBL1",
+    "name": "customer_accounts",
+    "description": "Registered customers.",
+    "columns": [
+     {
+      "name": "id",
+      "type": "integer",
+      "primary_key": true,
+      "nullable": false,
+      "unique": true,
+      "description": null
+     },
+     {
+      "name": "email",
+      "type": "varchar(320)",
+      "primary_key": false,
+      "nullable": false,
+      "unique": true,
+      "description": "case-insensitive unique"
+     },
+     {
+      "name": "password_hash",
+      "type": "varchar(255)",
+      "primary_key": false,
+      "nullable": false,
+      "unique": false,
+      "description": null
+     }
+    ],
+    "indexes": [
+     "unique index on lower(email)"
+    ]
+   }
+  ],
+  "table_relationships": [],
+  "business_rules": [
+   {
+    "grounding": "EXPLICIT",
+    "requirement_ids": [
+     "REQ-4"
+    ],
+    "task_ids": [
+     "T2"
+    ],
+    "rationale": null,
+    "rule_id": "BR1",
+    "title": "Reject duplicate email",
+    "description": "An already registered email cannot register again.",
+    "module_id": "M2",
+    "pseudocode": "if repo.find_by_email(email): raise Conflict"
+   }
+  ],
+  "sequence_flows": [
+   {
+    "grounding": "EXPLICIT",
+    "requirement_ids": [
+     "REQ-5",
+     "REQ-6"
+    ],
+    "task_ids": [
+     "T4"
+    ],
+    "rationale": null,
+    "sequence_id": "SEQ1",
+    "name": "Successful registration",
+    "description": "Happy path.",
+    "participants": [
+     {
+      "participant_id": "P1",
+      "label": "Customer",
+      "ref_id": null
+     },
+     {
+      "participant_id": "P2",
+      "label": "RegistrationController",
+      "ref_id": "M1"
+     },
+     {
+      "participant_id": "P3",
+      "label": "RegistrationService",
+      "ref_id": "M2"
+     }
+    ],
+    "steps": [
+     {
+      "order": 1,
+      "source_participant_id": "P1",
+      "target_participant_id": "P2",
+      "message": "POST /api/register",
+      "api_id": "API1"
+     },
+     {
+      "order": 2,
+      "source_participant_id": "P2",
+      "target_participant_id": "P3",
+      "message": "register(email, password)",
+      "api_id": null
+     },
+     {
+      "order": 3,
+      "source_participant_id": "P3",
+      "target_participant_id": "P2",
+      "message": "account created",
+      "api_id": null
+     }
+    ]
+   }
+  ],
+  "design_patterns": [
+   {
+    "pattern_id": "DP1",
+    "name": "Repository",
+    "applied_to_module_ids": [
+     "M3"
+    ],
+    "rationale": "Isolates persistence.",
+    "grounding": "INFERRED"
+   }
+  ],
+  "error_handling": [
+   {
+    "rule_id": "ER1",
+    "title": "Map domain errors to HTTP",
+    "approach": "Duplicate email -> 409; validation failure -> 422.",
+    "api_ids": [
+     "API1"
+    ],
+    "status_code": null
+   }
+  ],
+  "validation_rules": [
+   {
+    "rule_id": "VR1",
+    "data_model_id": "DM1",
+    "field_name": "email",
+    "rule": "Must be a syntactically valid email address.",
+    "requirement_ids": [
+     "REQ-2"
+    ]
+   }
+  ],
+  "open_items": [
+   {
+    "item_id": "OL1",
+    "kind": "UNKNOWN",
+    "statement": "Password complexity policy is not specified.",
+    "impact": "Validation rules for passwords cannot be finalised.",
+    "requirement_ids": []
+   }
+  ]
+ }
+}

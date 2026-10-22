@@ -1,0 +1,17 @@
+[core]
+	repositoryformatversion = 0
+	filemode = false
+	bare = false
+	logallrefupdates = true
+[remote "gitsafe-backup"]
+	url = git://gitsafe:5418/backup.git
+	fetch = +refs/heads/*:refs/remotes/gitsafe-backup/*
+	skipFetchAll = true
+	lfsurl = http://gitsafe:5419
+[branch "main"]
+	vscode-merge-base = origin/main
+[lfs "http://gitsafe:5419"]
+	locksverify = false
+[remote "origin"]
+	url = https://github.com/sayaligurav7789/AI_Workforce.git
+	fetch = +refs/heads/*:refs/remotes/origin/*
