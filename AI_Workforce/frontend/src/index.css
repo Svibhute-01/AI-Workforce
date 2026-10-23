@@ -136,3 +136,58 @@ html[data-theme='dark'] .bg-green-50 { background-color: #10281f; }
 html[data-theme='dark'] .text-green-800 { color: #6ee7b7; }
 html[data-theme='dark'] .text-green-600 { color: #4ade80; }
 html[data-theme='dark'] .text-blue-800 { color: #93c5fd; }
+
+/* ---------------------------------------------------------------------------
+   Developer workspace palette (RGB triples, used by the ide-* Tailwind colours).
+   Follows the app theme: light by default, dark under html[data-theme='dark'].
+   --------------------------------------------------------------------------- */
+.ide {
+  color-scheme: light;
+  --ide-bg: 246 248 250;
+  --ide-panel: 255 255 255;
+  --ide-border: 216 222 228;
+  --ide-hover: 234 238 242;
+  --ide-text: 31 35 40;
+  --ide-text2: 87 96 106;
+  --ide-muted: 101 109 118;
+  --ide-faint: 140 149 159;
+  --ide-code: 31 35 40;
+  --ide-accent: 0 121 242;
+  --ide-accent-hover: 0 102 204;
+  --ide-info: 9 105 218;
+  --ide-success: 26 127 55;
+  --ide-danger: 207 34 46;
+  --ide-dangertext: 130 7 27;
+  --ide-warn: 154 103 0;
+  --ide-syn-keyword: 207 34 46;
+  --ide-syn-string: 10 48 105;
+  --ide-syn-comment: 110 119 129;
+  --ide-syn-number: 5 80 174;
+  --ide-syn-decorator: 149 56 0;
+  --ide-syn-name: 130 80 223;
+}
+html[data-theme='dark'] .ide {
+  color-scheme: dark;
+  --ide-bg: 14 21 37;
+  --ide-panel: 28 35 51;
+  --ide-border: 43 50 69;
+  --ide-hover: 43 50 69;
+  --ide-text: 245 249 252;
+  --ide-text2: 194 200 212;
+  --ide-muted: 157 162 176;
+  --ide-faint: 107 114 128;
+  --ide-code: 230 237 243;
+  --ide-accent: 0 121 242;
+  --ide-accent-hover: 0 102 204;
+  --ide-info: 121 192 255;
+  --ide-success: 63 185 80;
+  --ide-danger: 248 81 73;
+  --ide-dangertext: 255 161 152;
+  --ide-warn: 247 185 85;
+  --ide-syn-keyword: 255 123 114;
+  --ide-syn-string: 165 214 255;
+  --ide-syn-comment: 139 148 158;
+  --ide-syn-number: 121 192 255;
+  --ide-syn-decorator: 255 166 87;
+  --ide-syn-name: 210 168 255;
+}

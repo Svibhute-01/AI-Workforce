@@ -9,11 +9,13 @@ an ``AgentRun`` so it appears next to the other agents' runs.
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..dependencies import get_current_user, get_project_or_404
+from ..developer.export import runs_to_csv
 from ..developer.client import DeveloperAgentClient, DeveloperServiceError, get_developer_client
 from ..developer.prompt import blocking_dependencies, build_task_text, tech_stack, workspace_id
 from ..models import AgentRun, ArchDesign, PMTask, Project, User
@@ -117,8 +119,8 @@ def _to_response(run: AgentRun) -> DeveloperRunResponse:
     )
 
 
-def _sync_active(db: Session, project: Project, client: DeveloperAgentClient) -> list[AgentRun]:
-    runs = _developer_runs(db, project)
+def _sync_active(db: Session, project: Project, client: DeveloperAgentClient, limit: int = 20) -> list[AgentRun]:
+    runs = _developer_runs(db, project, limit)
     for run in runs:
         _sync(db, project, run, client)
     return runs
@@ -204,6 +206,24 @@ def list_runs(
 ):
     project = get_project_or_404(project_id, user, db)
     return [_to_response(run) for run in _sync_active(db, project, client)]
+
+
+# Declared before "/runs/{run_id}" so that "export" is not parsed as a run id.
+@router.get("/runs/export")
+def export_runs(
+    project_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    client: DeveloperAgentClient = Depends(get_developer_client),
+):
+    """Download every Developer run of the project as a CSV file, with a summary block."""
+    project = get_project_or_404(project_id, user, db)
+    runs = _sync_active(db, project, client, limit=100000)
+    return Response(
+        content=runs_to_csv(runs),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="developer-runs-project-{project.id}.csv"'},
+    )
 
 
 @router.get("/runs/{run_id}", response_model=DeveloperRunResponse)

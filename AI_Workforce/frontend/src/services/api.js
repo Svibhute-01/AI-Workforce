@@ -155,6 +155,27 @@ export const apiService = {
     getRun: (projectId, runId) =>
       request(`/projects/${projectId}/developer/runs/${runId}`),
 
+    // Downloads a CSV of every run. It bypasses request() because the reply is a file, not JSON.
+    exportRuns: async (projectId) => {
+      const token = localStorage.getItem('accessToken')
+      const response = await fetch(`${API_BASE_URL}/projects/${projectId}/developer/runs/export`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
+      if (!response.ok) {
+        let detail = null
+        try { detail = (await response.json()).detail } catch { /* not JSON */ }
+        throw new Error(detail || `Export failed (${response.status})`)
+      }
+      const url = URL.createObjectURL(await response.blob())
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `developer-runs-project-${projectId}.csv`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+    },
+
     runCommand: (projectId, command) =>
       request(`/projects/${projectId}/developer/commands`, {
         method: 'POST',

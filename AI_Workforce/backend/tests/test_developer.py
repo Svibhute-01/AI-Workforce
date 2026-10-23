@@ -207,3 +207,86 @@ def test_client_hides_service_credentials_problems_and_network_errors():
     with pytest.raises(DeveloperServiceError) as down:
         api.get_job("project_1", "x")
     assert down.value.status_code == 503
+
+
+# --- CSV export ---------------------------------------------------------------------------------
+
+import csv as csv_module
+import io
+from datetime import datetime, timedelta, timezone
+
+from app.developer.export import run_row, runs_to_csv
+
+
+def _finished_run(db, project, task_id, status, attempts, seconds, errors=None, title="Task"):
+    started = datetime(2026, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+    run = AgentRun(
+        project_id=project.id, agent_name="Developer AI", status=status,
+        started_at=started, completed_at=started + timedelta(seconds=seconds),
+        input_summary={"task_id": task_id, "task_title": title, "tech_stack": "FastAPI"},
+        output_summary={"attempts": attempts, "changes": [{"path": "a.py"}, {"path": "b.py"}], "errors": errors or []},
+    )
+    db.add(run)
+    db.commit()
+    return run
+
+
+def _parse(text):
+    body, _, summary = text.partition("\r\n\r\n")
+    rows = list(csv_module.DictReader(io.StringIO(body)))
+    stats = dict(row for row in csv_module.reader(io.StringIO(summary)) if len(row) == 2)
+    return rows, stats
+
+
+def test_export_lists_every_run_with_a_summary(client, project, fake, db):
+    _finished_run(db, project, "T1", "COMPLETED", 1, 60, title="First")
+    _finished_run(db, project, "T2", "COMPLETED", 3, 240, title="Second")
+    _finished_run(db, project, "T3", "FAILED", 3, 300, errors=["Step 'install' failed:\nTimed out"], title="Third")
+
+    response = client.get(f"{BASE.format(project.id)}/runs/export", headers=project.headers)
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/csv")
+    assert "attachment" in response.headers["content-disposition"]
+
+    rows, stats = _parse(response.text)
+    assert [row["task_id"] for row in rows] == ["T1", "T2", "T3"]
+    assert [row["first_try_success"] for row in rows] == ["yes", "no", "no"]
+    assert rows[0]["duration_seconds"] == "60.0" and rows[0]["files_changed"] == "2"
+    assert rows[2]["final_error"] == "Step 'install' failed:"
+    assert rows[1]["final_error"] == ""
+    assert stats["Total runs"] == "3" and stats["Completed"] == "2" and stats["Failed"] == "1"
+    assert stats["Success rate (%)"] == "66.7"
+    assert stats["First-try success rate (%)"] == "33.3"
+    assert stats["Average attempts"] == "2.3"
+    assert stats["Average duration (seconds)"] == "200.0"
+
+
+def test_export_of_a_project_without_runs_is_valid(client, project, fake):
+    response = client.get(f"{BASE.format(project.id)}/runs/export", headers=project.headers)
+    assert response.status_code == 200
+    _, stats = _parse(response.text)
+    assert stats["Total runs"] == "0" and stats["Success rate (%)"] == "n/a"
+
+
+def test_running_runs_are_counted_but_not_in_the_rates(client, project, fake):
+    start(client, project)  # stays PROCESSING because the fake job is "running"
+    _, stats = _parse(client.get(f"{BASE.format(project.id)}/runs/export", headers=project.headers).text)
+    assert stats["Total runs"] == "1" and stats["Still running"] == "1" and stats["Finished runs"] == "0"
+
+
+def test_cells_that_look_like_formulas_are_neutralised(db, project):
+    run = _finished_run(db, project, "T1", "FAILED", 3, 10, errors=["=HYPERLINK(\"http://x\")"], title="=SUM(A1)")
+    csv_text = runs_to_csv([run])
+    assert "'=SUM(A1)" in csv_text and "'=HYPERLINK" in csv_text
+
+
+def test_naive_database_timestamps_do_not_break_the_duration(db, project):
+    run = _finished_run(db, project, "T1", "COMPLETED", 1, 90)
+    run.started_at, run.completed_at = run.started_at.replace(tzinfo=None), run.completed_at.replace(tzinfo=None)
+    assert run_row(run)["duration_seconds"] == 90.0
+
+
+def test_export_requires_login_and_ownership(client, project, fake, make_user):
+    assert client.get(f"{BASE.format(project.id)}/runs/export").status_code == 401
+    outsider = make_user()
+    assert client.get(f"{BASE.format(project.id)}/runs/export", headers=outsider["headers"]).status_code == 404

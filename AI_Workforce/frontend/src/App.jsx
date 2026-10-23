@@ -24,7 +24,7 @@ function App() {
         <Route path="/projects/:id" element={<PrivateRoute><ProjectDetails /></PrivateRoute>} />
         <Route path="/tasks" element={<PrivateRoute><Tasks /></PrivateRoute>} />
         <Route path="/agents" element={<PrivateRoute><AIAgents /></PrivateRoute>} />
-        <Route path="/developer" element={<PrivateRoute><Developer /></PrivateRoute>} />
+        <Route path="/developer" element={<PrivateRoute fullScreen><Developer /></PrivateRoute>} />
         <Route path="/chat" element={<PrivateRoute><AIChat /></PrivateRoute>} />
         <Route path="/documents" element={<PrivateRoute><Documents /></PrivateRoute>} />
         <Route path="/reports" element={<PrivateRoute><Reports /></PrivateRoute>} />
