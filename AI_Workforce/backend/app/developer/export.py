@@ -8,7 +8,7 @@ from ..models import AgentRun
 
 COLUMNS = [
     "run_id", "task_id", "task_title", "status", "attempts", "first_try_success",
-    "started_at", "completed_at", "duration_seconds", "files_changed", "tech_stack", "final_error",
+    "started_at", "completed_at", "duration_seconds", "files_changed", "stack", "tech_stack", "final_error",
 ]
 FINISHED = ("COMPLETED", "FAILED")
 
@@ -49,6 +49,7 @@ def run_row(run: AgentRun) -> dict:
         "completed_at": _aware(run.completed_at).isoformat() if run.completed_at else "",
         "duration_seconds": _duration(run),
         "files_changed": len(output.get("changes") or []),
+        "stack": info.get("stack"),
         "tech_stack": info.get("tech_stack"),
         "final_error": (final_error[0][:300] if final_error and run.status != "COMPLETED" else ""),
     }

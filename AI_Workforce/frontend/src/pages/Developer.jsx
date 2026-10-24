@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertCircle, ArrowLeft, ChevronDown, ChevronUp, Code2, Download, Maximize2, Minimize2, Moon, RefreshCw, Sun, Terminal } from 'lucide-react'
+import { AlertCircle, ArrowLeft, ChevronDown, ChevronUp, Code2, Download, ExternalLink, Maximize2, Minimize2, Moon, Play, RefreshCw, Square, Sun, Terminal } from 'lucide-react'
 import apiService from '../services/api'
 import CodeEditor from '../components/developer/CodeEditor'
 import FileTree from '../components/developer/FileTree'
@@ -19,6 +19,8 @@ const PREREQUISITE_PREFIX = 'Complete these prerequisite tasks first'
 const RUN_LABEL = { PROCESSING: 'Working', COMPLETED: 'Completed', FAILED: 'Failed' }
 const RUN_COLOR = { PROCESSING: 'text-ide-info', COMPLETED: 'text-ide-success', FAILED: 'text-ide-danger' }
 const DOT_COLOR = { PROCESSING: 'bg-ide-info animate-pulse', COMPLETED: 'bg-ide-success', FAILED: 'bg-ide-danger' }
+
+const NO_APP = { running: false, log: '', note: '' }
 
 const toolbarButton =
   'flex items-center gap-1.5 px-2.5 py-1 rounded text-[13px] border border-ide-border text-ide-text2 hover:bg-ide-hover disabled:opacity-40 disabled:hover:bg-transparent'
@@ -44,6 +46,10 @@ function Developer() {
   const [panelOpen, setPanelOpen] = useState(true)
   const [panelHeight, setPanelHeight] = useState(260)
   const [theme, setTheme] = useState(currentTheme())
+  const [stackInfo, setStackInfo] = useState(null)
+  const [stackChoice, setStackChoice] = useState('auto')
+  const [appStatus, setAppStatus] = useState(NO_APP)
+  const [appBusy, setAppBusy] = useState(false)
   const [fullscreen, setFullscreen] = useState(Boolean(document.fullscreenElement))
   const navigate = useNavigate()
 
@@ -67,6 +73,14 @@ function Developer() {
     setTasks([...taskList].sort((a, b) => a.execution_index - b.execution_index))
     setFiles(fileList)
     return fileList
+  }, [])
+
+  const loadStack = useCallback(async (id) => {
+    try {
+      setStackInfo(await apiService.developer.getStack(id))
+    } catch {
+      setStackInfo(null)
+    }
   }, [])
 
   const closeTab = useCallback((path) => {
@@ -135,11 +149,16 @@ function Developer() {
     setRun(null)
     setBottomTab('run')
     setError('')
+    setStackInfo(null)
+    setStackChoice('auto')
+    setAppStatus(NO_APP)
+    loadStack(projectId)
+    apiService.developer.getApp(projectId).then((status) => { if (!cancelled) setAppStatus(status) }).catch(() => {})
     Promise.all([loadWorkspace(projectId), apiService.developer.getRuns(projectId)])
       .then(([, runs]) => { if (!cancelled && runs.length) setRun(runs[0]) })
       .catch((requestError) => { if (!cancelled) setError(requestError.message) })
     return () => { cancelled = true }
-  }, [projectId, loadWorkspace])
+  }, [projectId, loadWorkspace, loadStack])
 
   // Poll while the agent is working.
   useEffect(() => {
@@ -150,6 +169,7 @@ function Developer() {
         setRun(latest)
         if (latest.status !== 'PROCESSING') {
           await loadWorkspace(projectId)
+          await loadStack(projectId)
           await refreshOpenFiles()
           const firstChange = latest.changes?.find((change) => change.action !== 'delete')
           if (!tabsRef.current.length && firstChange) await openFile(firstChange.path)
@@ -159,14 +179,24 @@ function Developer() {
       }
     }, 3000)
     return () => clearInterval(timer)
-  }, [working, run?.id, projectId, loadWorkspace, refreshOpenFiles, openFile])
+  }, [working, run?.id, projectId, loadWorkspace, loadStack, refreshOpenFiles, openFile])
+
+  // While a preview runs, check on it: it stops by itself after a time limit or if the app crashes.
+  useEffect(() => {
+    if (!appStatus.running) return undefined
+    const timer = setInterval(() => {
+      apiService.developer.getApp(projectId).then(setAppStatus).catch(() => {})
+    }, 5000)
+    return () => clearInterval(timer)
+  }, [appStatus.running, projectId])
 
   const startTask = async (task, force = false) => {
     setStartingTask(task.task_id)
     setError('')
     setForcePrompt(null)
     try {
-      setRun(await apiService.developer.runTask(projectId, task.task_id, force))
+      setRun(await apiService.developer.runTask(projectId, task.task_id, force, stackChoice === 'auto' ? null : stackChoice))
+      setAppStatus(NO_APP) // starting a task stops the preview: its files are about to change
       setBottomTab('run')
       setPanelOpen(true)
       setTasks((current) => current.map((item) => (item.task_id === task.task_id ? { ...item, status: 'IN_PROGRESS' } : item)))
@@ -210,6 +240,32 @@ function Developer() {
 
   const exitWorkspace = () => (window.history.state?.idx > 0 ? navigate(-1) : navigate('/dashboard'))
 
+  const startApp = async () => {
+    setAppBusy(true)
+    setError('')
+    try {
+      setAppStatus(await apiService.developer.startApp(projectId))
+      setBottomTab('app')
+      setPanelOpen(true)
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setAppBusy(false)
+    }
+  }
+
+  const stopApp = async () => {
+    setAppBusy(true)
+    try {
+      await apiService.developer.stopApp(projectId)
+      setAppStatus(NO_APP)
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setAppBusy(false)
+    }
+  }
+
   const exportRuns = async () => {
     setExporting(true)
     setError('')
@@ -248,6 +304,8 @@ function Developer() {
     window.addEventListener('pointerup', onUp)
   }
 
+  const commands = COMMANDS.filter((command) => !stackInfo || stackInfo.commands.includes(command.id))
+
   const statusText = run
     ? `${RUN_LABEL[run.status] || run.status}${run.attempts ? ` · attempt ${run.attempts}` : ''}`
     : 'Ready'
@@ -275,6 +333,36 @@ function Developer() {
           <span className={`hidden sm:flex items-center gap-2 text-[13px] ${RUN_COLOR[run.status] || ''}`}>
             <span className={`w-2 h-2 rounded-full ${DOT_COLOR[run.status] || 'bg-ide-faint'}`} />{statusText}
           </span>
+        )}
+        <select
+          value={stackInfo?.stack || stackChoice}
+          onChange={(event) => setStackChoice(event.target.value)}
+          disabled={Boolean(stackInfo?.stack)}
+          title={stackInfo?.stack ? 'A project keeps the stack it started with' : 'Choose the stack for the first task, or let it follow the architecture'}
+          className="!bg-ide-panel !text-ide-text border border-ide-border text-[13px] rounded px-2 py-1 max-w-[11rem] disabled:opacity-80 focus:outline-none focus:border-ide-accent"
+          aria-label="Stack"
+        >
+          {!stackInfo?.stack && <option value="auto">Stack: auto</option>}
+          {(stackInfo?.available || []).map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+        </select>
+        {appStatus.running ? (
+          <>
+            <a href={appStatus.url} target="_blank" rel="noopener noreferrer" className={`${toolbarButton} !text-ide-success`} title="Open the running app in a new tab">
+              <ExternalLink className="w-3.5 h-3.5" /><span className="hidden md:inline">Open app</span>
+            </a>
+            <button onClick={stopApp} disabled={appBusy} className={toolbarButton} title="Stop the app">
+              <Square className="w-3.5 h-3.5" /><span className="hidden md:inline">Stop</span>
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={startApp}
+            disabled={working || appBusy || !files.length || stackInfo?.can_start === false}
+            className={toolbarButton}
+            title="Start the generated app so you can open it"
+          >
+            <Play className="w-3.5 h-3.5" /><span className="hidden md:inline">{appBusy ? 'Starting...' : 'Run app'}</span>
+          </button>
         )}
         <button onClick={exportRuns} disabled={exporting || !run} className={toolbarButton} title="Download all runs of this project as a CSV file">
           <Download className="w-3.5 h-3.5" /><span className="hidden md:inline">{exporting ? 'Exporting...' : 'Export runs'}</span>
@@ -333,6 +421,7 @@ function Developer() {
               {[
                 { id: 'run', label: 'Agent run', dot: run && DOT_COLOR[run.status] },
                 { id: 'terminal', label: 'Terminal', icon: Terminal },
+                { id: 'app', label: 'App', dot: appStatus.running && 'bg-ide-success' },
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -345,7 +434,7 @@ function Developer() {
                 </button>
               ))}
               <span className="flex-1" />
-              {COMMANDS.map((command) => (
+              {commands.map((command) => (
                 <button
                   key={command.id}
                   onClick={() => runCommand(command.id)}
@@ -363,6 +452,19 @@ function Developer() {
             {panelOpen && (
               <div className="flex-1 min-h-0 overflow-auto p-3">
                 {bottomTab === 'run' && <RunPanel run={run} onOpenFile={openFile} />}
+                {bottomTab === 'app' && (
+                  <div className="text-[13px]">
+                    {appStatus.running ? (
+                      <p className="mb-2 text-ide-success">
+                        Running at <a className="underline" href={appStatus.url} target="_blank" rel="noopener noreferrer">{appStatus.url}</a>
+                        {appStatus.expires_at ? ` · stops automatically at ${new Date(appStatus.expires_at * 1000).toLocaleTimeString()}` : ''}
+                      </p>
+                    ) : (
+                      <p className="mb-2 text-ide-muted">{appStatus.note || 'The app is not running. Press Run app to start it.'}</p>
+                    )}
+                    {appStatus.log && <pre className="font-mono text-xs text-ide-code whitespace-pre-wrap m-0">{appStatus.log}</pre>}
+                  </div>
+                )}
                 {bottomTab === 'terminal' && (
                   <pre className="text-[13px] font-mono text-ide-code whitespace-pre-wrap m-0">
                     {commandBusy

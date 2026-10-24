@@ -81,6 +81,8 @@ The Developer Agent lives in `Developer_Agent/` and runs as its own service on p
 | `POST /api/projects/{id}/developer/tasks/{task_id}/run` | Start the agent on one PM task (202). Refuses (409) while another run is active or blocking prerequisite tasks are not completed (`{"force": true}` overrides the latter) |
 | `GET /api/projects/{id}/developer/runs`, `/runs/{run_id}` | Progress, attempts, log, changed files. Polling also syncs the run and the task status |
 | `GET /api/projects/{id}/developer/workspace/files`, `/workspace/file?path=` | Browse the generated code |
+| `GET /api/projects/{id}/developer/stack` | The project's stack (Python/FastAPI, Node/Express or static site), the commands it supports, and the available stacks. The first task fixes the stack; `{"stack": "node-express"}` in the run request chooses it |
+| `GET /api/projects/{id}/developer/app`, `POST .../app/start`, `POST .../app/stop` | Start the generated app and get its URL, check it, stop it. It stops by itself after about 15 minutes |
 | `POST /api/projects/{id}/developer/commands` | `install`, `check_imports` or `test` in the project's workspace |
 
 Every run is stored as an `AgentRun` named "Developer AI", so it appears in the agent activity

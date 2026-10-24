@@ -17,12 +17,31 @@ class FakeDeveloperClient:
         self.started: list[dict] = []
         self.job = {"status": "running", "attempts": 1, "summary": None, "changes": [], "errors": [], "log": []}
         self.unreachable = False
+        self.app_running = False
+        self.app_error = ""
 
-    def start_task(self, workspace, task, tech_stack):
+    def start_task(self, workspace, task, tech_stack, stack=None):
         if self.unreachable:
             raise DeveloperServiceError(503, "The Developer Agent service is not reachable.")
-        self.started.append({"workspace": workspace, "task": task, "tech_stack": tech_stack})
-        return {"job_id": f"job{len(self.started)}"}
+        self.started.append({"workspace": workspace, "task": task, "tech_stack": tech_stack, "stack": stack})
+        return {"job_id": f"job{len(self.started)}", "stack": stack or "python-fastapi"}
+
+    def get_stack(self, workspace):
+        return {"stack": "python-fastapi", "label": "Python / FastAPI", "commands": ["install", "test"],
+                "can_start": True, "runner": "local", "available": [{"id": "python-fastapi", "label": "Python / FastAPI"}]}
+
+    def get_app(self, workspace):
+        return {"running": self.app_running, "url": "http://127.0.0.1:9100/" if self.app_running else None, "log": ""}
+
+    def start_app(self, workspace):
+        if self.app_error:
+            raise DeveloperServiceError(409, self.app_error)
+        self.app_running = True
+        return self.get_app(workspace)
+
+    def stop_app(self, workspace):
+        was, self.app_running = self.app_running, False
+        return {"stopped": was}
 
     def get_job(self, workspace, job_id):
         if self.unreachable:
@@ -190,7 +209,7 @@ def test_task_text_includes_only_design_items_traced_to_the_task(db, project):
     text = build_task_text(db, db.get(Project, project.id), task)
     assert "POST /register" in text and "email valid" in text and "Table users" in text
     assert "/other" not in text
-    assert "only the Python backend part" in text
+    assert "environment rules" in text
     assert tech_stack(design) == "FastAPI, PostgreSQL"
 
 
@@ -290,3 +309,53 @@ def test_export_requires_login_and_ownership(client, project, fake, make_user):
     assert client.get(f"{BASE.format(project.id)}/runs/export").status_code == 401
     outsider = make_user()
     assert client.get(f"{BASE.format(project.id)}/runs/export", headers=outsider["headers"]).status_code == 404
+
+
+# --- Stacks and the preview app ------------------------------------------------------------------
+
+def test_the_requested_stack_is_forwarded_and_recorded(client, project, fake, db):
+    response = start(client, project, stack="node-express")
+    assert response.status_code == 202
+    assert fake.started[0]["stack"] == "node-express"
+    assert db.get(AgentRun, response.json()["id"]).input_summary["stack"] == "node-express"
+
+
+def test_stack_endpoint_lists_options_and_commands(client, project, fake):
+    body = client.get(f"{BASE.format(project.id)}/stack", headers=project.headers).json()
+    assert body["stack"] == "python-fastapi" and body["commands"] == ["install", "test"] and body["can_start"] is True
+
+
+def test_app_can_be_started_inspected_and_stopped(client, project, fake):
+    base = BASE.format(project.id)
+    assert client.get(f"{base}/app", headers=project.headers).json()["running"] is False
+    started = client.post(f"{base}/app/start", headers=project.headers)
+    assert started.status_code == 200 and started.json()["url"] == "http://127.0.0.1:9100/"
+    assert client.post(f"{base}/app/stop", headers=project.headers).json() == {"stopped": True}
+
+
+def test_app_errors_from_the_service_reach_the_user(client, project, fake):
+    fake.app_error = "Dependencies are not installed yet. Run a task first (or press Install)."
+    response = client.post(f"{BASE.format(project.id)}/app/start", headers=project.headers)
+    assert response.status_code == 409 and "not installed" in response.json()["detail"]
+
+
+def test_app_cannot_start_while_the_agent_is_working(client, project, fake):
+    start(client, project)
+    assert client.post(f"{BASE.format(project.id)}/app/start", headers=project.headers).status_code == 409
+
+
+def test_app_endpoints_are_protected(client, project, fake, make_user):
+    base = BASE.format(project.id)
+    assert client.get(f"{base}/app").status_code == 401
+    outsider = make_user()
+    for method, path in (("get", "app"), ("post", "app/start"), ("post", "app/stop"), ("get", "stack")):
+        assert getattr(client, method)(f"{base}/{path}", headers=outsider["headers"]).status_code == 404
+
+
+def test_export_has_a_stack_column(client, project, fake, db):
+    _finished_run(db, project, "T1", "COMPLETED", 1, 30)
+    run = db.query(AgentRun).filter_by(project_id=project.id).one()
+    run.input_summary = {**run.input_summary, "stack": "node-express"}
+    db.commit()
+    rows, _ = _parse(client.get(f"{BASE.format(project.id)}/runs/export", headers=project.headers).text)
+    assert rows[0]["stack"] == "node-express"

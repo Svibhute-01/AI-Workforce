@@ -26,7 +26,9 @@ from ..schemas_developer import (
     DeveloperRunResponse,
     DeveloperTaskRunRequest,
     FileContentResponse,
+    AppStatus,
     FileListResponse,
+    StackInfo,
 )
 
 router = APIRouter(prefix="/api/projects/{project_id}/developer", tags=["developer"])
@@ -183,7 +185,7 @@ def run_task(
     db.commit()
 
     try:
-        job = client.start_task(workspace, build_task_text(db, project, task), stack)
+        job = client.start_task(workspace, build_task_text(db, project, task), stack, body.stack if body else None)
     except DeveloperServiceError as exc:
         run.status = "FAILED"
         run.error = exc.detail[:4000]
@@ -191,7 +193,7 @@ def run_task(
         db.commit()
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
-    run.input_summary = {**run.input_summary, "job_id": job["job_id"]}
+    run.input_summary = {**run.input_summary, "job_id": job["job_id"], "stack": job.get("stack")}
     task.status = "IN_PROGRESS"
     db.commit()
     return _to_response(run)
@@ -259,3 +261,51 @@ def run_command(
     if any(run.status == ACTIVE for run in _sync_active(db, project, client)):
         raise HTTPException(status_code=409, detail="Wait for the Developer agent to finish before running commands.")
     return CommandResponse(**_call(client.run_command, workspace_id(project.id), body.command))
+
+
+@router.get("/stack", response_model=StackInfo)
+def get_stack(
+    project_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    client: DeveloperAgentClient = Depends(get_developer_client),
+):
+    """The project's stack (None until its first run) and the stacks the Developer agent supports."""
+    project = get_project_or_404(project_id, user, db)
+    return _call(client.get_stack, workspace_id(project.id))
+
+
+@router.get("/app", response_model=AppStatus)
+def get_app(
+    project_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    client: DeveloperAgentClient = Depends(get_developer_client),
+):
+    project = get_project_or_404(project_id, user, db)
+    return _call(client.get_app, workspace_id(project.id))
+
+
+@router.post("/app/start", response_model=AppStatus)
+def start_app(
+    project_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    client: DeveloperAgentClient = Depends(get_developer_client),
+):
+    """Start the generated app so the user can open it. It stops by itself after a while."""
+    project = get_project_or_404(project_id, user, db)
+    if any(run.status == ACTIVE for run in _sync_active(db, project, client)):
+        raise HTTPException(status_code=409, detail="Wait for the Developer agent to finish before starting the app.")
+    return _call(client.start_app, workspace_id(project.id))
+
+
+@router.post("/app/stop")
+def stop_app(
+    project_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    client: DeveloperAgentClient = Depends(get_developer_client),
+):
+    project = get_project_or_404(project_id, user, db)
+    return _call(client.stop_app, workspace_id(project.id))

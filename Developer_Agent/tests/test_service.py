@@ -118,3 +118,88 @@ def test_job_of_another_project_is_not_readable(client, monkeypatch):
     started = client.post("/projects/p_one/tasks", json={"task": "x"}, headers=HEADERS)
     wait_for(client, "p_one", started.json()["job_id"])
     assert client.get(f"/projects/p_two/jobs/{started.json()['job_id']}", headers=HEADERS).status_code == 404
+
+
+# --- Stacks and the preview app ---------------------------------------------------------------
+
+from app.tools.smoke import probe
+
+
+class StaticSite:
+    def invoke(self, inputs):
+        # The prompt must carry the stack's own rules, not the Python ones.
+        assert "static website" in inputs["rules"]
+        return DeveloperOutput(
+            summary="site",
+            changes=[
+                FileChange(path="index.html", action="create", content='<h1>Hi</h1><link href="s.css" rel="stylesheet">', explanation="page"),
+                FileChange(path="s.css", action="create", content="h1{color:red}", explanation="style"),
+            ],
+        )
+
+
+def test_stack_is_detected_saved_and_cannot_be_switched(client, monkeypatch):
+    monkeypatch.setattr(nodes, "developer_chain", StaticSite())
+    started = client.post("/projects/p_stack/tasks", json={"task": "x", "tech_stack": "HTML, CSS"}, headers=HEADERS)
+    assert started.status_code == 202 and started.json()["stack"] == "static-html"
+    job = wait_for(client, "p_stack", started.json()["job_id"])
+    assert job["status"] == "success"
+
+    info = client.get("/projects/p_stack/stack", headers=HEADERS).json()
+    assert info["stack"] == "static-html" and info["commands"] == [] and info["can_start"] is True
+
+    clash = client.post("/projects/p_stack/tasks", json={"task": "y", "stack": "node-express"}, headers=HEADERS)
+    assert clash.status_code == 409 and "one stack" in clash.json()["detail"]
+    assert client.post("/projects/p_new/tasks", json={"task": "y", "stack": "cobol"}, headers=HEADERS).status_code == 400
+
+
+def test_commands_are_limited_to_what_the_stack_supports(client, monkeypatch):
+    monkeypatch.setattr(nodes, "developer_chain", StaticSite())
+    started = client.post("/projects/p_nocmd/tasks", json={"task": "x", "stack": "static-html"}, headers=HEADERS)
+    wait_for(client, "p_nocmd", started.json()["job_id"])
+    response = client.post("/projects/p_nocmd/run", json={"command": "test"}, headers=HEADERS)
+    assert response.status_code == 400 and "not available" in response.json()["detail"]
+
+
+def test_a_preview_can_be_started_opened_and_stopped(client, monkeypatch):
+    monkeypatch.setattr(nodes, "developer_chain", StaticSite())
+    started = client.post("/projects/p_preview/tasks", json={"task": "x", "stack": "static-html"}, headers=HEADERS)
+    wait_for(client, "p_preview", started.json()["job_id"])
+
+    assert client.get("/projects/p_preview/app", headers=HEADERS).json()["running"] is False
+    running = client.post("/projects/p_preview/app/start", headers=HEADERS)
+    assert running.status_code == 200, running.text
+    url = running.json()["url"]
+    try:
+        assert probe(url) == 200
+        assert client.get("/projects/p_preview/app", headers=HEADERS).json()["running"] is True
+    finally:
+        assert client.post("/projects/p_preview/app/stop", headers=HEADERS).json() == {"stopped": True}
+    assert probe(url, timeout=1) is None
+
+
+def test_a_new_task_stops_the_running_preview(client, monkeypatch):
+    monkeypatch.setattr(nodes, "developer_chain", StaticSite())
+    first = client.post("/projects/p_restart/tasks", json={"task": "x", "stack": "static-html"}, headers=HEADERS)
+    wait_for(client, "p_restart", first.json()["job_id"])
+    url = client.post("/projects/p_restart/app/start", headers=HEADERS).json()["url"]
+    second = client.post("/projects/p_restart/tasks", json={"task": "y"}, headers=HEADERS)
+    wait_for(client, "p_restart", second.json()["job_id"])
+    assert client.get("/projects/p_restart/app", headers=HEADERS).json()["running"] is False
+    assert probe(url, timeout=1) is None
+
+
+def test_the_preview_needs_files_and_no_running_job(client):
+    assert client.post("/projects/p_empty/app/start", headers=HEADERS).status_code == 409
+    assert client.get("/projects/p_empty/app", headers=HEADERS).status_code == 200
+
+
+def test_a_project_without_a_saved_stack_gets_one_from_its_files(client):
+    from app.tools.workspace import Workspace
+    ws = Workspace("p_legacy")
+    ws.write_file("requirements.txt", "fastapi\n")
+    ws.write_file("app/main.py", "x = 1\n")
+    info = client.get("/projects/p_legacy/stack", headers=HEADERS).json()
+    assert info["stack"] == "python-fastapi"
+    assert info["commands"] == ["install", "check_imports", "test"] and info["can_start"] is True
+    assert client.get("/projects/p_empty_stack/stack", headers=HEADERS).json()["stack"] is None

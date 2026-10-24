@@ -143,11 +143,23 @@ export const apiService = {
     readFile: (projectId, path) =>
       request(`/projects/${projectId}/developer/workspace/file?path=${encodeURIComponent(path)}`),
 
-    runTask: (projectId, taskId, force = false) =>
+    runTask: (projectId, taskId, force = false, stack = null) =>
       request(`/projects/${projectId}/developer/tasks/${encodeURIComponent(taskId)}/run`, {
         method: 'POST',
-        body: JSON.stringify({ force }),
+        body: JSON.stringify({ force, stack }),
       }),
+
+    getStack: (projectId) =>
+      request(`/projects/${projectId}/developer/stack`),
+
+    getApp: (projectId) =>
+      request(`/projects/${projectId}/developer/app`),
+
+    startApp: (projectId) =>
+      request(`/projects/${projectId}/developer/app/start`, { method: 'POST' }),
+
+    stopApp: (projectId) =>
+      request(`/projects/${projectId}/developer/app/stop`, { method: 'POST' }),
 
     getRuns: (projectId) =>
       request(`/projects/${projectId}/developer/runs`),

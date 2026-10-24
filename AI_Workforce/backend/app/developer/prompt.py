@@ -76,8 +76,8 @@ def build_task_text(db: Session, project: Project, task: PMTask) -> str:
     lines += _design_section(design, task)
     lines += [
         "",
-        "Scope: implement only the Python backend part of this task, plus pytest tests that cover the "
-        "acceptance criteria. Frontend work, deployment files and external services are out of scope for this run.",
+        "Scope: implement this task with tests that cover the acceptance criteria, following the environment rules "
+        "of the project's stack. Deployment files and external services are out of scope for this run.",
     ]
     return "\n".join(lines)
 

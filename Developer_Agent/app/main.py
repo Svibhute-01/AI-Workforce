@@ -11,10 +11,13 @@ import logging
 from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 
-from app.config import SERVICE_KEY
+from app.apps import AppError, AppManager
+from app.config import RUNNER_MODE, SERVICE_KEY
 from app.graph.builder import build_developer_graph
 from app.jobs import JobConflict, JobStore
-from app.tools.runner import LocalRunner
+from app.projects import get_stack_id, set_stack_id
+from app.stacks import STACKS, detect_stack, get_stack, infer_stack_from_files
+from app.tools.runner import make_runner
 from app.tools.workspace import Workspace, WorkspaceError
 
 logger = logging.getLogger("developer_agent")
@@ -31,6 +34,12 @@ app = FastAPI(title="Developer Agent API", dependencies=[Depends(require_service
 
 developer_graph = build_developer_graph()
 jobs = JobStore()
+apps = AppManager()
+
+
+@app.on_event("shutdown")
+def stop_previews():
+    apps.stop_all()
 
 
 class ProjectCreate(BaseModel):
@@ -40,6 +49,7 @@ class ProjectCreate(BaseModel):
 class TaskRequest(BaseModel):
     task: str = Field(min_length=1, max_length=20000)
     tech_stack: str = "Python, FastAPI"
+    stack: str | None = None   # a stack id, or None/"auto" to choose from tech_stack
 
 
 class RunRequest(BaseModel):
@@ -76,13 +86,42 @@ def read_file(project_id: str, path: str):
         raise HTTPException(status_code=404, detail=str(exc))
 
 
-def _execute_job(job_id: str, project_id: str, task: str, tech_stack: str) -> None:
+def stack_info(project_id: str) -> dict:
+    # A project made before stacks existed has files but no saved stack: work it out from the files.
+    stack_id = get_stack_id(project_id) or infer_stack_from_files(get_workspace(project_id).list_files())
+    stack = STACKS.get(stack_id) if stack_id else None
+    return {
+        "project_id": project_id,
+        "stack": stack_id,
+        "label": stack.label if stack else None,
+        "commands": stack.visible_commands if stack else [],
+        "can_start": bool(stack and stack.start),
+        "runner": RUNNER_MODE,
+        "available": [{"id": item.id, "label": item.label} for item in STACKS.values()],
+    }
+
+
+def resolve_stack(project_id: str, requested: str | None, tech_stack: str) -> str:
+    """A project keeps the stack it started with. The first task decides it."""
+    if requested and requested != "auto" and requested not in STACKS:
+        raise HTTPException(status_code=400, detail=f"Unknown stack {requested!r}")
+    saved = get_stack_id(project_id) or infer_stack_from_files(get_workspace(project_id).list_files())
+    if saved and requested not in (None, "auto", saved):
+        raise HTTPException(
+            status_code=409,
+            detail=f"This project already uses {STACKS[saved].label}. A project keeps one stack.",
+        )
+    return saved or (requested if requested not in (None, "auto") else detect_stack(tech_stack))
+
+
+def _execute_job(job_id: str, project_id: str, task: str, tech_stack: str, stack_id: str) -> None:
     """Run the LangGraph workflow, recording progress after every node."""
     jobs.update(job_id, status="running", log="Started")
     state = {
         "project_id": project_id,
         "task": task,
         "tech_stack": tech_stack,
+        "stack": stack_id,
         "output": None,
         "validation_errors": [],
         "retries": 0,
@@ -123,11 +162,15 @@ def _execute_job(job_id: str, project_id: str, task: str, tech_stack: str) -> No
 @app.post("/projects/{project_id}/tasks", status_code=202)
 def start_task(project_id: str, body: TaskRequest):
     get_workspace(project_id)  # validates the id
+    stack_id = resolve_stack(project_id, body.stack, body.tech_stack)
     try:
         job = jobs.create(project_id, body.task, body.tech_stack)
     except JobConflict as exc:
         raise HTTPException(status_code=409, detail=str(exc))
-    jobs.submit(_execute_job, job["job_id"], project_id, body.task, body.tech_stack)
+    set_stack_id(project_id, stack_id)
+    apps.stop(project_id)   # the files are about to change under a running preview
+    job["stack"] = stack_id
+    jobs.submit(_execute_job, job["job_id"], project_id, body.task, body.tech_stack, stack_id)
     return job
 
 
@@ -145,11 +188,51 @@ def get_job(project_id: str, job_id: str):
     return job
 
 
+@app.get("/stacks")
+def list_stacks():
+    return {"runner": RUNNER_MODE, "available": [{"id": s.id, "label": s.label} for s in STACKS.values()]}
+
+
+@app.get("/projects/{project_id}/stack")
+def project_stack(project_id: str):
+    get_workspace(project_id)
+    return stack_info(project_id)
+
+
 @app.post("/projects/{project_id}/run")
 def run_command(project_id: str, body: RunRequest):
-    runner = LocalRunner(get_workspace(project_id).root)
+    workspace = get_workspace(project_id)
+    stack = get_stack(get_stack_id(project_id) or infer_stack_from_files(workspace.list_files()))
+    if body.command not in stack.visible_commands:
+        raise HTTPException(status_code=400, detail=f"Command not available for {stack.label}: {body.command!r}")
     try:
-        result = runner.run(body.command)
+        result = make_runner(workspace.root, stack).run(body.command)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     return {"command": result.name, "ok": result.ok, "exit_code": result.exit_code, "output": result.summary()}
+
+
+@app.get("/projects/{project_id}/app")
+def app_status(project_id: str):
+    get_workspace(project_id)
+    return apps.status(project_id)
+
+
+@app.post("/projects/{project_id}/app/start")
+def start_app(project_id: str):
+    workspace = get_workspace(project_id)
+    stack_id = get_stack_id(project_id) or infer_stack_from_files(workspace.list_files())
+    if not stack_id:
+        raise HTTPException(status_code=409, detail="This project has no files yet. Run a task first.")
+    if any(job["status"] in ("queued", "running") for job in jobs.list(project_id)):
+        raise HTTPException(status_code=409, detail="Wait for the Developer agent to finish first.")
+    try:
+        return apps.start(project_id, workspace, get_stack(stack_id))
+    except AppError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc))
+
+
+@app.post("/projects/{project_id}/app/stop")
+def stop_app(project_id: str):
+    get_workspace(project_id)
+    return {"stopped": apps.stop(project_id)}
