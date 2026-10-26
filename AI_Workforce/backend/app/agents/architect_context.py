@@ -17,12 +17,14 @@ from .pm_context import MissingRequirementsError, RequirementsContext, build_req
 
 __all__ = ["ArchitectContext", "MissingPlanError", "MissingRequirementsError", "build_architect_context"]
 
-# The platform's own stack. It is offered to the model as a *default to prefer when it fits*,
-# never as something the SRS asked for, so choices that use it are classified ASSUMED.
+# The stack the Developer AI can build and verify. The Architect must design with it: a design that
+# names something else cannot be implemented as drawn. Because the SRS does not choose a stack,
+# choices that use it are classified ASSUMED.
 PREFERRED_STACK = {
     "backend": "Python with FastAPI and SQLAlchemy",
-    "database": "PostgreSQL",
-    "frontend": "React (Vite) with Tailwind CSS",
+    "database": "PostgreSQL (accessed through SQLAlchemy)",
+    "frontend": "Server-rendered HTML with Jinja2 templates, plain CSS and JavaScript, served by the FastAPI backend "
+                "(no React, Vue, Angular or any build step)",
     "ai": "Google Gemini via the existing provider abstraction",
 }
 _DESCRIPTION_LIMIT = 400

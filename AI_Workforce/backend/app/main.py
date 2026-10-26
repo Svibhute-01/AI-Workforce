@@ -3,7 +3,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api import analysis, architect, auth, dashboard, developer, documents, project_manager, projects, user_settings, workflow
+from .api import analysis, architect, auth, dashboard, developer, documents, project_manager, qa, projects, user_settings, workflow
 from .config import get_settings
 from .database import init_db
 
@@ -33,6 +33,7 @@ app.include_router(dashboard.router)
 app.include_router(user_settings.router)
 app.include_router(workflow.router)
 app.include_router(developer.router)
+app.include_router(qa.router)
 
 
 @app.on_event("startup")

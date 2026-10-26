@@ -1,13 +1,15 @@
-import { Play } from 'lucide-react'
+import { Play, ShieldCheck } from 'lucide-react'
+import { verdictInfo } from './qaUtils'
 
 const DOT = {
   TODO: 'bg-ide-faint',
   IN_PROGRESS: 'bg-ide-info animate-pulse',
   COMPLETED: 'bg-ide-success',
 }
+const QA_TEXT = { success: 'text-ide-success', danger: 'text-ide-danger', warn: 'text-ide-warn', muted: 'text-ide-muted' }
 const LABEL = { TODO: 'Todo', IN_PROGRESS: 'In progress', COMPLETED: 'Completed' }
 
-function TaskList({ tasks, working, startingTask, activeTaskId, onStart }) {
+function TaskList({ tasks, working, startingTask, activeTaskId, onStart, qaByTask = {}, onQa = () => {} }) {
   const done = tasks.filter((task) => task.status === 'COMPLETED').length
   const percent = tasks.length ? Math.round((done / tasks.length) * 100) : 0
 
@@ -41,7 +43,20 @@ function TaskList({ tasks, working, startingTask, activeTaskId, onStart }) {
                   {task.dependencies?.length > 0 && (
                     <p className="text-[11px] text-ide-muted mt-0.5">After {task.dependencies.join(', ')}</p>
                   )}
+                  {qaByTask[task.task_id] && (
+                    <p className={`text-[11px] mt-0.5 ${QA_TEXT[verdictInfo(qaByTask[task.task_id].verdict).tone]}`}>
+                      QA: {qaByTask[task.task_id].status === 'PROCESSING' ? 'testing...' : verdictInfo(qaByTask[task.task_id].verdict).label}
+                    </p>
+                  )}
                 </div>
+                <button
+                  onClick={() => onQa(task)}
+                  disabled={working || Boolean(startingTask)}
+                  title="QA: test the running app against this task's acceptance criteria"
+                  className="flex-shrink-0 w-7 h-7 rounded flex items-center justify-center border border-ide-border text-ide-text2 hover:bg-ide-hover disabled:opacity-40 disabled:hover:bg-transparent"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                </button>
                 <button
                   onClick={() => onStart(task)}
                   disabled={working || Boolean(startingTask)}

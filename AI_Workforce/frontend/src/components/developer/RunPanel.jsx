@@ -24,6 +24,15 @@ function RunPanel({ run, onOpenFile }) {
 
       {run.summary && <p className="text-ide-muted mb-3">{run.summary}</p>}
 
+      {run.deviations?.length > 0 && (
+        <div className="mb-3 bg-ide-warn/10 border border-ide-warn/40 text-ide-warn px-3 py-2 rounded">
+          <p className="font-medium mb-1">Not built as the System Architect designed it</p>
+          <ul className="list-disc pl-5 text-xs space-y-0.5">
+            {run.deviations.map((item) => <li key={item}>{item}</li>)}
+          </ul>
+        </div>
+      )}
+
       {run.status === 'FAILED' && run.errors?.length > 0 && (
         <div className="mb-3 bg-ide-danger/10 border border-ide-danger/40 text-ide-dangertext px-3 py-2 rounded flex gap-2">
           <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />

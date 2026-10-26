@@ -4,10 +4,12 @@ import { AlertCircle, ArrowLeft, ChevronDown, ChevronUp, Code2, Download, Extern
 import apiService from '../services/api'
 import CodeEditor from '../components/developer/CodeEditor'
 import FileTree from '../components/developer/FileTree'
+import QaPanel from '../components/developer/QaPanel'
 import RunPanel from '../components/developer/RunPanel'
 import TaskList from '../components/developer/TaskList'
 import { buildTree } from '../components/developer/treeUtils'
 import { languageFor } from '../components/developer/syntax'
+import { latestByTask } from '../components/developer/qaUtils'
 import { applyTheme } from '../utils/theme'
 
 const COMMANDS = [
@@ -16,6 +18,7 @@ const COMMANDS = [
   { id: 'test', label: 'Run tests' },
 ]
 const PREREQUISITE_PREFIX = 'Complete these prerequisite tasks first'
+const STACK_CONFLICT_PREFIX = 'Stack conflict:'
 const RUN_LABEL = { PROCESSING: 'Working', COMPLETED: 'Completed', FAILED: 'Failed' }
 const RUN_COLOR = { PROCESSING: 'text-ide-info', COMPLETED: 'text-ide-success', FAILED: 'text-ide-danger' }
 const DOT_COLOR = { PROCESSING: 'bg-ide-info animate-pulse', COMPLETED: 'bg-ide-success', FAILED: 'bg-ide-danger' }
@@ -50,6 +53,9 @@ function Developer() {
   const [stackChoice, setStackChoice] = useState('auto')
   const [appStatus, setAppStatus] = useState(NO_APP)
   const [appBusy, setAppBusy] = useState(false)
+  const [qaRuns, setQaRuns] = useState([])
+  const [qaSending, setQaSending] = useState(false)
+  const [qaExporting, setQaExporting] = useState(false)
   const [fullscreen, setFullscreen] = useState(Boolean(document.fullscreenElement))
   const navigate = useNavigate()
 
@@ -62,7 +68,11 @@ function Developer() {
   tabsRef.current = tabs
   contentsRef.current = contents
 
-  const working = run?.status === 'PROCESSING'
+  const developerWorking = run?.status === 'PROCESSING'
+  const activeQa = qaRuns[0] || null
+  const qaWorking = activeQa?.status === 'PROCESSING'
+  const working = developerWorking || qaWorking   // both agents use the project's files, so only one runs at a time
+  const qaByTask = useMemo(() => latestByTask(qaRuns), [qaRuns])
   const tree = useMemo(() => buildTree(files), [files])
 
   const loadWorkspace = useCallback(async (id) => {
@@ -152,7 +162,9 @@ function Developer() {
     setStackInfo(null)
     setStackChoice('auto')
     setAppStatus(NO_APP)
+    setQaRuns([])
     loadStack(projectId)
+    apiService.qa.getRuns(projectId).then((runs) => { if (!cancelled) setQaRuns(runs) }).catch(() => {})
     apiService.developer.getApp(projectId).then((status) => { if (!cancelled) setAppStatus(status) }).catch(() => {})
     Promise.all([loadWorkspace(projectId), apiService.developer.getRuns(projectId)])
       .then(([, runs]) => { if (!cancelled && runs.length) setRun(runs[0]) })
@@ -162,7 +174,7 @@ function Developer() {
 
   // Poll while the agent is working.
   useEffect(() => {
-    if (!working) return undefined
+    if (!developerWorking) return undefined
     const timer = setInterval(async () => {
       try {
         const latest = await apiService.developer.getRun(projectId, run.id)
@@ -179,7 +191,22 @@ function Developer() {
       }
     }, 3000)
     return () => clearInterval(timer)
-  }, [working, run?.id, projectId, loadWorkspace, loadStack, refreshOpenFiles, openFile])
+  }, [developerWorking, run?.id, projectId, loadWorkspace, loadStack, refreshOpenFiles, openFile])
+
+  // Poll while QA is testing; when it finishes the task's status may have changed.
+  useEffect(() => {
+    if (!qaWorking) return undefined
+    const timer = setInterval(async () => {
+      try {
+        const latest = await apiService.qa.getRun(projectId, activeQa.id)
+        setQaRuns((runs) => runs.map((item) => (item.id === latest.id ? latest : item)))
+        if (latest.status !== 'PROCESSING') await loadWorkspace(projectId)
+      } catch (requestError) {
+        setError(requestError.message)
+      }
+    }, 3000)
+    return () => clearInterval(timer)
+  }, [qaWorking, activeQa?.id, projectId, loadWorkspace])
 
   // While a preview runs, check on it: it stops by itself after a time limit or if the app crashes.
   useEffect(() => {
@@ -190,19 +217,21 @@ function Developer() {
     return () => clearInterval(timer)
   }, [appStatus.running, projectId])
 
-  const startTask = async (task, force = false) => {
+  const startTask = async (task, force = false, allowDeviation = false) => {
     setStartingTask(task.task_id)
     setError('')
     setForcePrompt(null)
     try {
-      setRun(await apiService.developer.runTask(projectId, task.task_id, force, stackChoice === 'auto' ? null : stackChoice))
+      setRun(await apiService.developer.runTask(projectId, task.task_id, force, stackChoice === 'auto' ? null : stackChoice, allowDeviation))
       setAppStatus(NO_APP) // starting a task stops the preview: its files are about to change
       setBottomTab('run')
       setPanelOpen(true)
       setTasks((current) => current.map((item) => (item.task_id === task.task_id ? { ...item, status: 'IN_PROGRESS' } : item)))
     } catch (requestError) {
       if (requestError.message.startsWith(PREREQUISITE_PREFIX)) {
-        setForcePrompt({ task, message: requestError.message })
+        setForcePrompt({ task, message: requestError.message, kind: 'prerequisite' })
+      } else if (requestError.message.startsWith(STACK_CONFLICT_PREFIX)) {
+        setForcePrompt({ task, message: requestError.message, kind: 'stack' })
       } else {
         setError(requestError.message)
       }
@@ -239,6 +268,44 @@ function Developer() {
   }
 
   const exitWorkspace = () => (window.history.state?.idx > 0 ? navigate(-1) : navigate('/dashboard'))
+
+  const startQa = async (task) => {
+    setError('')
+    try {
+      const started = await apiService.qa.run(projectId, task.task_id)
+      setQaRuns((runs) => [started, ...runs])
+      setBottomTab('qa')
+      setPanelOpen(true)
+    } catch (requestError) {
+      setError(requestError.message)
+    }
+  }
+
+  const sendDefects = async () => {
+    setQaSending(true)
+    setError('')
+    try {
+      setRun(await apiService.qa.sendDefects(projectId, activeQa.id))
+      setQaRuns((runs) => runs.map((item) => (item.id === activeQa.id ? { ...item, defects_sent: true } : item)))
+      setBottomTab('run')
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setQaSending(false)
+    }
+  }
+
+  const exportQaRuns = async () => {
+    setQaExporting(true)
+    setError('')
+    try {
+      await apiService.qa.exportRuns(projectId)
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setQaExporting(false)
+    }
+  }
 
   const startApp = async () => {
     setAppBusy(true)
@@ -387,8 +454,18 @@ function Developer() {
 
       {forcePrompt && (
         <div className="flex-shrink-0 flex flex-wrap items-center gap-3 px-4 py-2 text-[13px] bg-ide-warn/10 border-b border-ide-warn/40 text-ide-warn">
-          <span className="flex-1">{forcePrompt.message}.</span>
-          <button className={toolbarButton} onClick={() => startTask(forcePrompt.task, true)}>Run anyway</button>
+          <span className="flex-1">{forcePrompt.message}{forcePrompt.message.endsWith('.') ? '' : '.'}</span>
+          {forcePrompt.kind === 'stack' ? (
+            <button
+              className={toolbarButton}
+              onClick={() => startTask(forcePrompt.task, false, true)}
+              title="The run goes ahead and the difference from the architecture is recorded on it and in the export"
+            >
+              Build anyway (record deviation)
+            </button>
+          ) : (
+            <button className={toolbarButton} onClick={() => startTask(forcePrompt.task, true)}>Run anyway</button>
+          )}
           <button className={toolbarButton} onClick={() => setForcePrompt(null)}>Cancel</button>
         </div>
       )}
@@ -400,8 +477,10 @@ function Developer() {
             tasks={tasks}
             working={working}
             startingTask={startingTask}
-            activeTaskId={working ? run?.task_id : null}
+            activeTaskId={developerWorking ? run?.task_id : qaWorking ? activeQa?.task_id : null}
             onStart={startTask}
+            qaByTask={qaByTask}
+            onQa={startQa}
           />
         </aside>
 
@@ -422,6 +501,7 @@ function Developer() {
                 { id: 'run', label: 'Agent run', dot: run && DOT_COLOR[run.status] },
                 { id: 'terminal', label: 'Terminal', icon: Terminal },
                 { id: 'app', label: 'App', dot: appStatus.running && 'bg-ide-success' },
+                { id: 'qa', label: 'QA', dot: activeQa && (activeQa.status === 'PROCESSING' ? 'bg-ide-info animate-pulse' : activeQa.verdict === 'PASS' ? 'bg-ide-success' : 'bg-ide-danger') },
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -452,6 +532,9 @@ function Developer() {
             {panelOpen && (
               <div className="flex-1 min-h-0 overflow-auto p-3">
                 {bottomTab === 'run' && <RunPanel run={run} onOpenFile={openFile} />}
+                {bottomTab === 'qa' && (
+                  <QaPanel run={activeQa} onSendDefects={sendDefects} sending={qaSending} onExport={exportQaRuns} exporting={qaExporting} />
+                )}
                 {bottomTab === 'app' && (
                   <div className="text-[13px]">
                     {appStatus.running ? (

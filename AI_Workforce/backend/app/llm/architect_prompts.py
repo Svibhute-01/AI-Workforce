@@ -68,10 +68,13 @@ Rules:
    Manager task ids ONLY. Never mix them up.
 3. Do NOT introduce a technology, integration, feature or actor because it is popular.
    If the requirements do not call for it, leave it out.
-4. Prefer the project's existing stack (below) when it is appropriate for the
-   requirements. Because the SRS does not choose a stack, choices that use it are
-   ASSUMED, with the trade-off explained. Use something else only when the requirements
-   need it, and say why.
+4. The Developer AI can build and verify ONLY the project stack below, so design with it:
+   use it for the backend, the database and the frontend, and name its technologies on
+   the components. Because the SRS does not choose a stack, choices that use it are
+   ASSUMED, with the trade-off explained. Do NOT propose another language, framework,
+   database or frontend framework for those layers. If the requirements truly cannot be
+   met with this stack, say so in `open_items` as UNKNOWN instead of choosing something
+   the Developer cannot build.
 5. If a decision is not specified, state the assumption and the trade-off. Never present
    an assumption as a requirement.
 6. Do NOT write application source code. Signatures, field lists, schemas and short
@@ -130,7 +133,7 @@ Manager, given below as JSON. You do not read the SRS. Produce the HIGH-LEVEL DE
 
 {_GROUNDING_RULES}
 
-EXISTING PROJECT STACK (prefer when appropriate):
+PROJECT STACK (the only stack the Developer AI can build):
 {_stack_block(preferred_stack)}
 
 ============================================================
@@ -229,7 +232,7 @@ from. Stay consistent with the HLD and do not contradict or re-decide it.
 
 {_GROUNDING_RULES}
 
-EXISTING PROJECT STACK (prefer when appropriate):
+PROJECT STACK (the only stack the Developer AI can build; keep the LLD within it):
 {_stack_block(preferred_stack)}
 
 ============================================================

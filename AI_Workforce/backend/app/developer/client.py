@@ -47,9 +47,14 @@ class DeveloperAgentClient:
     def read_file(self, workspace: str, path: str) -> str:
         return self._request("GET", f"/projects/{workspace}/file", params={"path": path})["content"]
 
-    def start_task(self, workspace: str, task: str, tech_stack: str, stack: str | None = None) -> dict:
-        body = {"task": task, "tech_stack": tech_stack, "stack": stack}
+    def start_task(self, workspace: str, task: str, tech_stack: str, stack: str | None = None,
+                   architecture: list[dict] | None = None, allow_deviation: bool = False) -> dict:
+        body = {"task": task, "tech_stack": tech_stack, "stack": stack,
+                "architecture": architecture or [], "allow_deviation": allow_deviation}
         return self._request("POST", f"/projects/{workspace}/tasks", json=body)
+
+    def start_qa(self, workspace: str, brief: dict) -> dict:
+        return self._request("POST", f"/projects/{workspace}/qa", json=brief)
 
     def get_stack(self, workspace: str) -> dict:
         return self._request("GET", f"/projects/{workspace}/stack")

@@ -19,12 +19,17 @@ class FakeDeveloperClient:
         self.unreachable = False
         self.app_running = False
         self.app_error = ""
+        self.conflict = ""
 
-    def start_task(self, workspace, task, tech_stack, stack=None):
+    def start_task(self, workspace, task, tech_stack, stack=None, architecture=None, allow_deviation=False):
         if self.unreachable:
             raise DeveloperServiceError(503, "The Developer Agent service is not reachable.")
-        self.started.append({"workspace": workspace, "task": task, "tech_stack": tech_stack, "stack": stack})
-        return {"job_id": f"job{len(self.started)}", "stack": stack or "python-fastapi"}
+        if self.conflict and not allow_deviation:
+            raise DeveloperServiceError(409, self.conflict)
+        self.started.append({"workspace": workspace, "task": task, "tech_stack": tech_stack, "stack": stack,
+                             "architecture": architecture or [], "allow_deviation": allow_deviation})
+        return {"job_id": f"job{len(self.started)}", "stack": stack or "python-fastapi",
+                "deviations": [self.conflict] if self.conflict else []}
 
     def get_stack(self, workspace):
         return {"stack": "python-fastapi", "label": "Python / FastAPI", "commands": ["install", "test"],
@@ -359,3 +364,73 @@ def test_export_has_a_stack_column(client, project, fake, db):
     db.commit()
     rows, _ = _parse(client.get(f"{BASE.format(project.id)}/runs/export", headers=project.headers).text)
     assert rows[0]["stack"] == "node-express"
+
+
+# --- The System Architect's stack is binding ---------------------------------------------------------
+
+from app.developer.stack_contract import architecture_items
+
+
+def _design(db, project, components):
+    design = ArchDesign(project_id=project.id, hld={"components": components}, lld={})
+    db.add(design)
+    db.commit()
+    return design
+
+
+COMPONENTS = [
+    {"type": "FRONTEND", "name": "Web App", "technology": "React (Vite) with Tailwind CSS"},
+    {"type": "API", "name": "API", "technology": "Python with FastAPI and SQLAlchemy"},
+    {"type": "SERVICE", "name": "Mailer", "technology": "SendGrid"},
+    {"type": "DATABASE", "name": "Database", "technology": "PostgreSQL"},
+    {"type": "CACHE", "name": "Cache", "technology": "Redis"},
+    {"type": "AI_SERVICE", "name": "LLM", "technology": "Gemini"},
+    {"type": "EXTERNAL_SYSTEM", "name": "SMS", "technology": "Twilio"},
+    {"type": "OTHER", "name": "Misc", "technology": "Anything"},
+    {"type": "DATABASE", "name": "NoTech", "technology": None},
+]
+
+
+def test_the_architects_components_become_binding_items(db, project):
+    items = architecture_items(_design(db, project, COMPONENTS))
+    assert [(i["role"], i["technology"]) for i in items] == [
+        ("frontend", "React (Vite) with Tailwind CSS"), ("backend", "Python with FastAPI and SQLAlchemy"),
+        ("service", "SendGrid"), ("database", "PostgreSQL"), ("infrastructure", "Redis"),
+    ]
+    assert architecture_items(None) == []
+
+
+def test_the_architecture_is_sent_with_every_task(client, project, fake, db):
+    _design(db, project, COMPONENTS)
+    assert start(client, project).status_code == 202
+    sent = fake.started[0]["architecture"]
+    assert {"role": "database", "technology": "PostgreSQL", "component": "Database"} in sent
+
+
+def test_a_stack_conflict_reaches_the_user_instead_of_being_swallowed(client, project, fake, db):
+    fake.conflict = "Stack conflict: the System Architect chose technologies that Python / FastAPI cannot build"
+    response = start(client, project)
+    assert response.status_code == 409 and response.json()["detail"].startswith("Stack conflict:")
+    assert db.query(AgentRun).filter_by(project_id=project.id).one().status == "FAILED"
+
+
+def test_an_allowed_deviation_is_recorded_on_the_run_and_in_the_export(client, project, fake, db):
+    fake.conflict = "frontend - Web App: React (Vite) with Tailwind CSS"
+    response = start(client, project, allow_deviation=True)
+    assert response.status_code == 202
+    body = response.json()
+    assert body["deviations"] == ["frontend - Web App: React (Vite) with Tailwind CSS"]
+    assert fake.started[0]["allow_deviation"] is True
+    rows, _ = _parse(client.get(f"{BASE.format(project.id)}/runs/export", headers=project.headers).text)
+    assert rows[0]["stack_deviations"] == "frontend - Web App: React (Vite) with Tailwind CSS"
+
+
+def test_the_architect_is_told_the_stack_the_developer_can_build():
+    from app.agents.architect_context import PREFERRED_STACK
+    from app.llm.architect_prompts import _stack_block
+    text = _stack_block(PREFERRED_STACK)
+    assert "FastAPI" in text and "PostgreSQL" in text and "Jinja2" in text and "React" in text and "no React" in text
+    import app.llm.architect_prompts as prompts
+    source = open(prompts.__file__, encoding="utf-8").read()
+    assert source.count("the only stack the Developer AI can build") == 2     # both the HLD and the LLD prompt
+    assert "EXISTING PROJECT STACK" not in source

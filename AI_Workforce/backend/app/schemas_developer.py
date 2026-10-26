@@ -9,6 +9,7 @@ DEVELOPER_AGENT_NAME = "Developer AI"
 class DeveloperTaskRunRequest(BaseModel):
     force: bool = False  # run even if blocking prerequisite tasks are not completed
     stack: str | None = None  # a stack id, or None to choose from the architecture. Fixed after the first run
+    allow_deviation: bool = False  # build even though part of the architecture cannot be built here (recorded)
 
 
 class FileListResponse(BaseModel):
@@ -68,6 +69,7 @@ class DeveloperRunResponse(BaseModel):
     summary: str | None = None
     changes: list[FileChangeResponse] = Field(default_factory=list)
     errors: list[str] = Field(default_factory=list)
+    deviations: list[str] = Field(default_factory=list)   # parts of the architecture that were not built as designed
     log: list[dict[str, Any]] = Field(default_factory=list)
     started_at: datetime | None = None
     completed_at: datetime | None = None

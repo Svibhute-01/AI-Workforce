@@ -17,6 +17,8 @@ from ..database import get_db
 from ..dependencies import get_current_user, get_project_or_404
 from ..developer.export import runs_to_csv
 from ..developer.client import DeveloperAgentClient, DeveloperServiceError, get_developer_client
+from ..developer.qa_sync import any_qa_active
+from ..developer.stack_contract import architecture_items
 from ..developer.prompt import blocking_dependencies, build_task_text, tech_stack, workspace_id
 from ..models import AgentRun, ArchDesign, PMTask, Project, User
 from ..schemas_developer import (
@@ -90,6 +92,7 @@ def _sync(db: Session, project: Project, run: AgentRun, client: DeveloperAgentCl
         "summary": job.get("summary"),
         "changes": job.get("changes", []),
         "errors": job.get("errors", []),
+        "deviations": job.get("deviations", []),
         "log": job.get("log", []),
     }
     if job["status"] in ("queued", "running"):
@@ -115,6 +118,7 @@ def _to_response(run: AgentRun) -> DeveloperRunResponse:
         summary=output.get("summary"),
         changes=output.get("changes", []),
         errors=output.get("errors", []),
+        deviations=output.get("deviations") or info.get("deviations") or [],
         log=output.get("log", []),
         started_at=run.started_at,
         completed_at=run.completed_at,
@@ -163,29 +167,47 @@ def run_task(
     """Start the Developer agent on one Project Manager task. Poll the run for progress."""
     project = get_project_or_404(project_id, user, db)
     task = _find_task(db, project, task_id)
+    return start_developer_run(
+        db, project, task, client,
+        force=bool(body and body.force), stack=body.stack if body else None,
+        allow_deviation=bool(body and body.allow_deviation),
+    )
 
+
+def start_developer_run(
+    db: Session, project: Project, task: PMTask, client: DeveloperAgentClient, *,
+    force: bool = False, stack: str | None = None, allow_deviation: bool = False,
+    extra_text: str = "", extra_input: dict | None = None,
+) -> DeveloperRunResponse:
+    """Start the Developer agent on a task. Shared by the run button and by QA's 'send defects to Developer'."""
     if any(run.status == ACTIVE for run in _sync_active(db, project, client)):
         raise HTTPException(status_code=409, detail="The Developer agent is already working on this project.")
+    if any_qa_active(db, project, client):
+        raise HTTPException(status_code=409, detail="QA is testing this project. Wait for it to finish.")
 
     blockers = blocking_dependencies(db, task)
-    if blockers and not (body and body.force):
+    if blockers and not force:
         names = ", ".join(blocker.task_id for blocker in blockers)
         raise HTTPException(status_code=409, detail=f"Complete these prerequisite tasks first: {names}")
 
     design = db.scalar(select(ArchDesign).where(ArchDesign.project_id == project.id))
     workspace = workspace_id(project.id)
-    stack = tech_stack(design)
+    stack_choice, stack = stack, tech_stack(design)
     run = AgentRun(
         project_id=project.id,
         agent_name=DEVELOPER_AGENT_NAME,
         status=ACTIVE,
-        input_summary={"task_id": task.task_id, "task_title": task.title, "workspace": workspace, "tech_stack": stack},
+        input_summary={"task_id": task.task_id, "task_title": task.title, "workspace": workspace, "tech_stack": stack,
+                       **(extra_input or {})},
     )
     db.add(run)
     db.commit()
 
     try:
-        job = client.start_task(workspace, build_task_text(db, project, task), stack, body.stack if body else None)
+        job = client.start_task(
+            workspace, build_task_text(db, project, task) + extra_text, stack, stack_choice,
+            architecture_items(design), allow_deviation,
+        )
     except DeveloperServiceError as exc:
         run.status = "FAILED"
         run.error = exc.detail[:4000]
@@ -193,7 +215,8 @@ def run_task(
         db.commit()
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
-    run.input_summary = {**run.input_summary, "job_id": job["job_id"], "stack": job.get("stack")}
+    run.input_summary = {**run.input_summary, "job_id": job["job_id"], "stack": job.get("stack"),
+                         "deviations": job.get("deviations", [])}
     task.status = "IN_PROGRESS"
     db.commit()
     return _to_response(run)
@@ -260,6 +283,8 @@ def run_command(
     project = get_project_or_404(project_id, user, db)
     if any(run.status == ACTIVE for run in _sync_active(db, project, client)):
         raise HTTPException(status_code=409, detail="Wait for the Developer agent to finish before running commands.")
+    if any_qa_active(db, project, client):
+        raise HTTPException(status_code=409, detail="QA is testing this project. Wait for it to finish.")
     return CommandResponse(**_call(client.run_command, workspace_id(project.id), body.command))
 
 
@@ -297,6 +322,8 @@ def start_app(
     project = get_project_or_404(project_id, user, db)
     if any(run.status == ACTIVE for run in _sync_active(db, project, client)):
         raise HTTPException(status_code=409, detail="Wait for the Developer agent to finish before starting the app.")
+    if any_qa_active(db, project, client):
+        raise HTTPException(status_code=409, detail="QA is testing this project. Wait for it to finish.")
     return _call(client.start_app, workspace_id(project.id))
 
 
