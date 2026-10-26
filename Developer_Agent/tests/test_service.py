@@ -203,3 +203,137 @@ def test_a_project_without_a_saved_stack_gets_one_from_its_files(client):
     assert info["stack"] == "python-fastapi"
     assert info["commands"] == ["install", "check_imports", "test"] and info["can_start"] is True
     assert client.get("/projects/p_empty_stack/stack", headers=HEADERS).json()["stack"] is None
+
+
+# --- The System Architect's stack is binding ---------------------------------------------------------
+
+ARCH = [
+    {"role": "frontend", "technology": "React (Vite) with Tailwind CSS", "component": "Web App"},
+    {"role": "backend", "technology": "Python with FastAPI and SQLAlchemy", "component": "API"},
+    {"role": "database", "technology": "PostgreSQL", "component": "Database"},
+]
+
+
+def test_a_task_is_refused_when_the_architecture_cannot_be_built(client):
+    response = client.post("/projects/p_gate/tasks", json={"task": "x", "stack": "python-fastapi", "architecture": ARCH}, headers=HEADERS)
+    assert response.status_code == 409
+    detail = response.json()["detail"]
+    assert detail.startswith("Stack conflict:") and "React (Vite) with Tailwind CSS" in detail
+    assert client.get("/projects/p_gate/jobs", headers=HEADERS).json()["jobs"] == []   # nothing started
+
+
+def test_an_explicit_deviation_is_allowed_recorded_and_told_to_the_model(client, monkeypatch):
+    seen = {}
+
+    class Spy(StaticSite):
+        def invoke(self, inputs):
+            seen["rules"] = inputs["rules"]
+            return DeveloperOutput(summary="ok", changes=[
+                FileChange(path="app/__init__.py", action="create", content="", explanation="p")])
+
+    monkeypatch.setattr(nodes, "developer_chain", Spy())
+    started = client.post(
+        "/projects/p_dev/tasks",
+        json={"task": "x", "stack": "python-fastapi", "architecture": ARCH, "allow_deviation": True},
+        headers=HEADERS,
+    )
+    assert started.status_code == 202
+    assert started.json()["deviations"] == ["frontend - Web App: React (Vite) with Tailwind CSS"]
+    job = wait_for(client, "p_dev", started.json()["job_id"])
+    assert job["deviations"] == started.json()["deviations"]
+    assert "follow it exactly" in seen["rules"] and "PostgreSQL" in seen["rules"] and "could NOT build" in seen["rules"]
+
+
+def test_a_buildable_architecture_starts_without_any_deviation(client, monkeypatch):
+    monkeypatch.setattr(nodes, "developer_chain", AlwaysBroken())
+    items = [{"role": "backend", "technology": "Python with FastAPI", "component": "API"},
+             {"role": "database", "technology": "PostgreSQL", "component": "DB"}]
+    response = client.post("/projects/p_ok/tasks", json={"task": "x", "stack": "python-fastapi", "architecture": items}, headers=HEADERS)
+    assert response.status_code == 202 and response.json()["deviations"] == []
+    wait_for(client, "p_ok", response.json()["job_id"])
+
+
+def test_a_task_without_architecture_is_not_gated(client, monkeypatch):
+    monkeypatch.setattr(nodes, "developer_chain", AlwaysBroken())
+    response = client.post("/projects/p_nogate/tasks", json={"task": "x"}, headers=HEADERS)
+    assert response.status_code == 202
+    wait_for(client, "p_nogate", response.json()["job_id"])
+
+
+# --- The QA agent ------------------------------------------------------------------------------------
+
+import threading
+
+import app.qa.chain as qa_chain_module
+from app.qa.schemas import Expect, QAPlan, Scenario, Step, Untestable
+
+QA_BODY = {
+    "task_id": "T1", "task_title": "Home page", "design_text": "",
+    "criteria": [{"id": "C1", "text": "The page greets the visitor"}, {"id": "C2", "text": "Mail is sent"}],
+}
+
+
+def _home_plan():
+    expect = Expect(status_in=[200], json_equals=[], json_present=[], json_absent=[], body_contains=["Hi"], body_absent=[])
+    step = Step(name="open", method="GET", path="/", json_body="", headers=[], expect=expect, save=[])
+    return QAPlan(scenarios=[Scenario(criterion_id="C1", title="greets", steps=[step])],
+                  untestable=[Untestable(criterion_id="C2", reason="needs a mail server")])
+
+
+class HomePlan:
+    def __init__(self, hold=None):
+        self.hold = hold
+
+    def invoke(self, inputs):
+        if self.hold:
+            self.hold.wait(10)
+        return _home_plan()
+
+
+def _site(client, monkeypatch, project):
+    monkeypatch.setattr(nodes, "developer_chain", StaticSite())
+    started = client.post(f"/projects/{project}/tasks", json={"task": "x", "stack": "static-html"}, headers=HEADERS)
+    wait_for(client, project, started.json()["job_id"])
+
+
+def test_qa_needs_code_to_test(client):
+    response = client.post("/projects/q_empty/qa", json=QA_BODY, headers=HEADERS)
+    assert response.status_code == 409 and "no code yet" in response.json()["detail"]
+
+
+def test_qa_needs_installed_dependencies(client):
+    from app.tools.workspace import Workspace
+    Workspace("q_nodeps").write_file("requirements.txt", "fastapi\n")
+    response = client.post("/projects/q_nodeps/qa", json=QA_BODY, headers=HEADERS)
+    assert response.status_code == 409 and "not installed" in response.json()["detail"]
+
+
+def test_qa_needs_at_least_one_criterion(client):
+    assert client.post("/projects/q_x/qa", json={**QA_BODY, "criteria": []}, headers=HEADERS).status_code == 422
+
+
+def test_a_qa_job_runs_and_returns_the_report(client, monkeypatch):
+    _site(client, monkeypatch, "q_site")
+    monkeypatch.setattr(qa_chain_module, "qa_chain", HomePlan())
+    started = client.post("/projects/q_site/qa", json=QA_BODY, headers=HEADERS)
+    assert started.status_code == 202 and started.json()["kind"] == "qa"
+    job = wait_for(client, "q_site", started.json()["job_id"])
+    assert job["status"] == "success"
+    report = job["report"]
+    assert report["verdict"] == "PASS" and report["coverage"] == 50.0      # one criterion verified, one not testable
+    assert {row["id"]: row["verdict"] for row in report["criteria"]} == {"C1": "PASS", "C2": "UNVERIFIED"}
+    assert "QA finished" in job["log"][-1]["message"]
+
+
+def test_the_developer_cannot_start_while_qa_is_running_and_the_reverse(client, monkeypatch):
+    _site(client, monkeypatch, "q_busy")
+    gate = threading.Event()
+    monkeypatch.setattr(qa_chain_module, "qa_chain", HomePlan(hold=gate))
+    qa = client.post("/projects/q_busy/qa", json=QA_BODY, headers=HEADERS)
+    try:
+        assert client.post("/projects/q_busy/tasks", json={"task": "y"}, headers=HEADERS).status_code == 409
+        assert client.post("/projects/q_busy/qa", json=QA_BODY, headers=HEADERS).status_code == 409
+        assert client.post("/projects/q_busy/app/start", headers=HEADERS).status_code == 409
+    finally:
+        gate.set()
+    wait_for(client, "q_busy", qa.json()["job_id"])

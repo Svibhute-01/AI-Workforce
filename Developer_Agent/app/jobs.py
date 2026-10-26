@@ -51,12 +51,13 @@ class JobStore:
         tmp.write_text(json.dumps(job), encoding="utf-8")
         tmp.replace(self.directory / f"{job['job_id']}.json")
 
-    def create(self, project_id: str, task: str, tech_stack: str) -> dict:
+    def create(self, project_id: str, task: str, tech_stack: str, kind: str = "developer") -> dict:
         with self._lock:
             if any(j["project_id"] == project_id and j["status"] in ACTIVE for j in self._jobs.values()):
                 raise JobConflict(f"A task is already running for project {project_id!r}.")
             job = {
                 "job_id": uuid.uuid4().hex,
+                "kind": kind,                # developer | qa
                 "project_id": project_id,
                 "task": task,
                 "tech_stack": tech_stack,

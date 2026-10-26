@@ -2,7 +2,7 @@ from app.chains.developer_chain import build_developer_chain
 from app.graph.states import DeveloperState
 from app.tools.workspace import Workspace
 from app.tools.checks import run_all_checks
-from app.stacks import get_stack, rules_for
+from app.stacks import contract_text, get_stack, rules_for
 from app.tools.context import build_existing_files_context
 from app.tools.context import build_context
 
@@ -30,7 +30,7 @@ def generate_node(state: DeveloperState) -> dict:
     result = developer_chain.invoke({
         "task": state["task"],
         "tech_stack": state["tech_stack"],
-        "rules": rules_for(get_stack(state.get("stack"))),
+        "rules": rules_for(get_stack(state.get("stack"))) + "\n\n" + contract_text(state.get("architecture") or [], state.get("deviations") or []),
         "existing_files": existing_files,
         "feedback": feedback,
     })

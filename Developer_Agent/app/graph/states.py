@@ -7,6 +7,8 @@ class DeveloperState(TypedDict):
     project_id: str
     task: str
     tech_stack: str
+    architecture: list   # the System Architect's technologies: [{role, technology, component}]
+    deviations: list     # parts of the architecture this agent could not build exactly
     stack: str          # stack profile id, e.g. "python-fastapi" (see app/stacks.py)
     
 

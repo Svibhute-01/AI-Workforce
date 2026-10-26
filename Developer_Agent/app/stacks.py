@@ -36,6 +36,8 @@ class Stack:
     structure: Callable | None = None              # in-process check after the files are written
     probe_ok: Callable[[int], bool] = field(default=lambda status: status < 500)
     keywords: tuple[str, ...] = ()
+    check_env: dict[str, str] = field(default_factory=dict)   # variables set for checks and the preview
+    supports: dict[str, tuple[str, ...]] = field(default_factory=dict)   # role -> technologies this stack can build
 
     @property
     def visible_commands(self) -> list[str]:
@@ -51,15 +53,22 @@ PYTHON_RULES = (
     "the project root. Do not use backend/ or frontend/ folders and do not create a second requirements file. "
     "3. requirements.txt: list only packages the code really imports, with NO exact version pins "
     "(plain names or '>=' ranges), and always include fastapi, uvicorn and pytest, plus httpx if tests use a "
-    "TestClient. Never use packages that compile from source (psycopg2, psycopg2-binary, mysqlclient, and similar). "
-    "4. Database: use SQLAlchemy and make the database URL configurable through an environment variable "
-    "that defaults to SQLite, so tests run without any server. "
+    "TestClient. Never use packages that compile from source (psycopg2, psycopg2-binary, mysqlclient, and similar); "
+    "for PostgreSQL use 'psycopg[binary]' (psycopg 3). "
+    "4. Database: use SQLAlchemy and read the database URL from the environment variable DATABASE_URL. Its default "
+    "value, when the variable is not set, must be the database the System Architect chose (for PostgreSQL: "
+    "postgresql+psycopg://postgres:postgres@localhost:5432/app). Create the engine lazily and do not connect to "
+    "the database at import time. The automatic checks and the preview set DATABASE_URL to a SQLite file, so the "
+    "tests and the app must work with whatever DATABASE_URL says: never hard-code a database in the code or tests, "
+    "and only pass SQLite-specific connect arguments (check_same_thread) when the URL starts with 'sqlite'. "
     "5. Hash passwords with the 'bcrypt' package directly, not passlib. "
     "6. After the tests pass, the app is started with 'uvicorn app.main:app' and GET / is requested, so the app "
     "must import and start with no setup. If the task needs a web page, serve HTML from the same app "
     "(HTMLResponse, or Jinja2 templates with jinja2 in requirements.txt, or StaticFiles) and make GET / return it. "
-    "7. Write only the files this stack needs. Do not create Docker or deployment files: they cannot be verified here. "
-    "8. Tests must not need the network, secrets or external services. "
+    "7. Frontend: only HTML, CSS and JavaScript served by this same FastAPI app (Jinja2 templates or StaticFiles). "
+    "Do not use React, Vue, Angular, Svelte, Vite, Tailwind or any tool that needs a build step. "
+    "8. Write only the files this stack needs. Do not create Docker or deployment files: they cannot be verified here. "
+    "Tests must not need the network, secrets or external services. "
     "9. If the feedback says installing failed, the cause is almost always requirements.txt: shorten it, "
     "remove pins and compiled packages."
 )
@@ -115,6 +124,12 @@ STACKS: dict[str, Stack] = {
         start=["{py}", "-m", "uvicorn", "app.main:app", "--host", "{host}", "--port", "{port}"],
         syntax=validate_python_syntax,
         keywords=("fastapi", "python", "flask", "django", "uvicorn", "pydantic", "sqlalchemy"),
+        check_env={"DATABASE_URL": "sqlite:///./app.db"},
+        supports={
+            "backend": ("python", "fastapi", "sqlalchemy", "pydantic", "uvicorn", "gemini", "google"),
+            "database": ("postgres", "postgresql", "sqlite"),
+            "frontend": ("html", "css", "javascript", "jinja", "server-rendered", "server rendered", "static", "template"),
+        },
     ),
     "node-express": Stack(
         id="node-express",
@@ -130,6 +145,11 @@ STACKS: dict[str, Stack] = {
         steps=("install", "check_imports", "test"),
         start=["{node}", "server.js"],
         keywords=("express", "node", "nodejs", "node.js", "npm"),
+        supports={
+            "backend": ("node", "express", "javascript"),
+            "database": ("in-memory", "memory", "json", "file"),
+            "frontend": ("html", "css", "javascript", "static", "template"),
+        },
     ),
     "static-html": Stack(
         id="static-html",
@@ -142,6 +162,7 @@ STACKS: dict[str, Stack] = {
         structure=validate_static_site,
         probe_ok=lambda status: status == 200,
         keywords=("html", "css", "static", "vanilla", "javascript website"),
+        supports={"frontend": ("html", "css", "javascript", "static")},
     ),
 }
 
@@ -181,3 +202,65 @@ def infer_stack_from_files(files: list[str]) -> str | None:
     if "index.html" in files:
         return "static-html"
     return None
+
+
+# --- The System Architect's stack is binding -------------------------------------------------------
+# The Architect names a technology for each component. The Developer must build exactly that, or say
+# clearly that it cannot. These technologies need a build step or a runtime this agent cannot verify,
+# so they are refused even when a supported word (such as "CSS" in "Tailwind CSS") appears next to them.
+UNBUILDABLE = (
+    "react", "vue", "angular", "svelte", "next.js", "nextjs", "nuxt", "vite", "webpack", "tailwind",
+    "typescript", "django", "flask", "spring", "java", ".net", "c#", "golang", "rust", "php", "laravel",
+    "rails", "ruby", "mongodb", "mysql", "mariadb", "oracle", "redis", "kafka", "rabbitmq",
+)
+ROLES = ("frontend", "backend", "database")
+SOFT_ROLES = ("infrastructure",)
+
+
+def _mentions(text: str, words) -> bool:
+    return any(word in text for word in words)
+
+
+def _mentions_whole_word(text: str, words) -> bool:
+    """Whole words only, so "java" does not match "JavaScript" and "rust" does not match "trust"."""
+    return any(re.search(rf"(?<![a-z0-9]){re.escape(word)}(?![a-z0-9])", text) for word in words)
+
+
+def check_contract(stack: "Stack", items: list[dict]) -> dict:
+    """Compare the Architect's technologies with what this stack can build and verify.
+
+    items: [{"role": "frontend"|"backend"|"database"|"infrastructure", "technology": str, "component": str}]
+    Returns {"unsupported": [...], "notes": [...]} of readable sentences. Nothing is dropped silently.
+    """
+    unsupported, notes = [], []
+    for item in items:
+        role, tech = item.get("role"), (item.get("technology") or "").strip()
+        label = f"{item.get('component') or role}: {tech}"
+        lowered = tech.lower()
+        if not tech:
+            continue
+        if role in SOFT_ROLES:
+            notes.append(f"{label} (infrastructure is not built or run by the Developer agent)")
+        elif role == "service":   # an internal service only has to avoid technologies this agent cannot build
+            if _mentions_whole_word(lowered, UNBUILDABLE):
+                unsupported.append(f"backend - {label}")
+        elif role not in ROLES:
+            continue
+        elif _mentions_whole_word(lowered, UNBUILDABLE) or not _mentions(lowered, stack.supports.get(role, ())):
+            unsupported.append(f"{role} - {label}")
+    return {"unsupported": unsupported, "notes": notes}
+
+
+def contract_text(items: list[dict], deviations: list[str]) -> str:
+    """The binding part of the instructions: what the Architect chose, and what could not be followed."""
+    if not items:
+        return ""
+    lines = ["ARCHITECTURE (chosen by the System Architect: follow it exactly and never substitute another technology):"]
+    lines += [f"- {item['role']}: {item['technology']} ({item.get('component') or 'component'})" for item in items if item.get("technology")]
+    if deviations:
+        lines.append(
+            "This agent could NOT build the following exactly as designed. Do not pretend otherwise: build the closest "
+            "supported equivalent only where unavoidable and leave a comment at the top of the affected file saying what "
+            "differs from the design: " + "; ".join(deviations)
+        )
+    return "\n".join(lines)

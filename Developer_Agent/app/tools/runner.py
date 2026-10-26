@@ -127,7 +127,7 @@ class BaseRunner:
     def _execute(self, name: str, command: list[str], timeout: int) -> CommandResult:
         raise NotImplementedError
 
-    def start_app(self, port: int, log_path: Path | None = None) -> AppHandle:
+    def start_app(self, port: int, log_path: Path | None = None, env: dict[str, str] | None = None) -> AppHandle:
         raise NotImplementedError
 
     # --- shared ----------------------------------------------------------------------------------
@@ -181,7 +181,7 @@ class LocalRunner(BaseRunner):
     def _execute(self, name: str, command: list[str], timeout: int) -> CommandResult:
         try:
             result = subprocess.run(
-                command, cwd=self.root, env=safe_env(), capture_output=True, text=True,
+                command, cwd=self.root, env=safe_env(self.stack.check_env), capture_output=True, text=True,
                 encoding="utf-8", errors="replace", timeout=timeout,
             )
             return CommandResult(name, result.returncode, result.stdout, result.stderr)
@@ -191,14 +191,14 @@ class LocalRunner(BaseRunner):
         except FileNotFoundError as exc:
             return CommandResult(name, -1, "", f"Executable not found: {exc}")
 
-    def start_app(self, port: int, log_path: Path | None = None) -> AppHandle:
+    def start_app(self, port: int, log_path: Path | None = None, env: dict[str, str] | None = None) -> AppHandle:
         command = self._fill(self.stack.start, port)
         log_path = log_path or (self.root.parent / f".{self.root.name}.app.log")
         log_path.parent.mkdir(parents=True, exist_ok=True)
         log = open(log_path, "wb")
         options = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if sys.platform == "win32" else {"start_new_session": True}
         process = subprocess.Popen(
-            command, cwd=self.root, env=safe_env({"PORT": str(port), "HOST": "127.0.0.1"}),
+            command, cwd=self.root, env=safe_env({**self.stack.check_env, **(env or {}), "PORT": str(port), "HOST": "127.0.0.1"}),
             stdout=log, stderr=subprocess.STDOUT, **options,
         )
         log.close()
@@ -225,8 +225,9 @@ class DockerRunner(BaseRunner):
         return args
 
     def docker_args(self, name: str, command: list[str], *, network: bool, detach: bool = False,
-                    port: int | None = None) -> list[str]:
-        args = self._base_args(name, network, {"PORT": str(port), "HOST": "0.0.0.0"} if port else None)
+                    port: int | None = None, env: dict[str, str] | None = None) -> list[str]:
+        extra = {**self.stack.check_env, **(env or {}), **({"PORT": str(port), "HOST": "0.0.0.0"} if port else {})}
+        args = self._base_args(name, network, extra)
         args.insert(2, "-d" if detach else "--rm")
         if port:
             args += ["-p", f"127.0.0.1:{port}:{port}"]
@@ -246,10 +247,10 @@ class DockerRunner(BaseRunner):
         except FileNotFoundError:
             return CommandResult(name, -1, "", "Docker is not installed or not on PATH. Start Docker Desktop, or set RUNNER_MODE=local.")
 
-    def start_app(self, port: int, log_path: Path | None = None) -> AppHandle:
+    def start_app(self, port: int, log_path: Path | None = None, env: dict[str, str] | None = None) -> AppHandle:
         container = f"devagent-app-{self.root.name}-{uuid.uuid4().hex[:8]}"
         # The container needs no outbound network to serve the app.
-        args = self.docker_args(container, self._fill(self.stack.start, port), network=False, detach=True, port=port)
+        args = self.docker_args(container, self._fill(self.stack.start, port), network=False, detach=True, port=port, env=env)
         result = subprocess.run(args, capture_output=True, text=True)
         if result.returncode != 0:
             raise RuntimeError(f"Could not start the container: {(result.stderr or result.stdout).strip()}")
