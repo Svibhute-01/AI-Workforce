@@ -58,3 +58,43 @@ class Untestable(BaseModel):
 class QAPlan(BaseModel):
     scenarios: list[Scenario]
     untestable: list[Untestable] = Field(description="Criteria that cannot be tested over HTTP, each with a reason")
+
+
+
+
+
+
+class TestSuiteResult(BaseModel):
+    """Structured result returned by the pytest runner."""
+
+    status: str = "inconclusive"
+
+    passed: int = 0
+    failed: int = 0
+    errors: int = 0
+    skipped: int = 0
+    total: int = 0
+
+    duration_seconds: float = 0.0
+    exit_code: int | None = None
+
+    message: str | None = None
+    stdout: str = ""
+    stderr: str = ""
+
+    # Reserved for a future code-coverage integration.
+    coverage_percent: float | None = None
+
+    # Validate that test counts cannot be negative.
+    class Config:
+        extra = "ignore"
+
+    @property
+    def is_successful(self) -> bool:
+        return (
+            self.status == "passed"
+            and self.failed == 0
+            and self.errors == 0
+            and self.total > 0
+        )
+

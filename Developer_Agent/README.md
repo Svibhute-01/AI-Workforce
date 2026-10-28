@@ -90,3 +90,11 @@ If `DEVELOPER_SERVICE_KEY` is empty the API is unauthenticated, so keep it bound
 ```bash
 pytest tests        # fake model, no Gemini quota used
 ```
+
+## QA-to-Developer automatic repair loop
+
+The QA endpoint can now hand structured QA failures to the existing Developer Agent graph. When a QA report has verdict `FAIL` and contains actionable `developer_feedback.issues`, the service asks the Developer Agent to make targeted fixes, runs the Developer Agent's normal validation workflow, and reruns QA. The loop is bounded to avoid unending model edits.
+
+Configure the maximum number of automatic QA repair rounds with `QA_AUTO_REPAIR_ROUNDS` in the environment (default: `2`, allowed range: `0`–`3`). Set it to `0` to disable automatic repairs while keeping QA reporting enabled. Each QA report includes an `auto_repair` object with attempted rounds, changed files, validation errors, and the final repair status. The detailed report is also written to `qa_report.json` inside the generated project workspace.
+
+The Developer Agent is instructed to fix application code rather than weaken or delete tests. Human review is still recommended before accepting generated code changes.

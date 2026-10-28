@@ -4,7 +4,8 @@ from dotenv import load_dotenv
 load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
-MAX_RETRIES = 3   # we'll use this in stage 4
+MAX_RETRIES = 3   # retries inside one Developer Agent run
+QA_AUTO_REPAIR_ROUNDS = max(0, min(3, int(os.getenv("QA_AUTO_REPAIR_ROUNDS", "2"))))
 
 if not GOOGLE_API_KEY:
     raise ValueError("GOOGLE_API_KEY is missing. Check your .env file.")
