@@ -14,10 +14,14 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
-from app.config import DOCKER_CPUS, DOCKER_MEMORY, RUNNER_MODE
+from app.config import (
+    CACHE_DIR, DOCKER_CPUS, DOCKER_MEMORY, IMPORT_TIMEOUT_SECONDS, INSTALL_TIMEOUT_SECONDS, RUNNER_MODE,
+    TEST_TIMEOUT_SECONDS,
+)
 
 # Per-command time limits in seconds. Installing is the slow one (many packages, cold cache).
-TIMEOUTS = {"install": 600, "check_imports": 60, "test": 300}
+# Override with INSTALL_TIMEOUT_SECONDS / IMPORT_TIMEOUT_SECONDS / TEST_TIMEOUT_SECONDS.
+TIMEOUTS = {"install": INSTALL_TIMEOUT_SECONDS, "check_imports": IMPORT_TIMEOUT_SECONDS, "test": TEST_TIMEOUT_SECONDS}
 SETUP_TIMEOUT = 120
 DEFAULT_TIMEOUT = 180
 
@@ -220,9 +224,25 @@ class DockerRunner(BaseRunner):
             args += ["--user", f"{os.getuid()}:{os.getgid()}"]
         if not network:
             args += ["--network", "none"]
+        else:
+            args += self._cache_args()   # only containers that already have the network (installs)
         for key, value in (extra_env or {}).items():
             args += ["-e", f"{key}={value}"]
         return args
+
+    @staticmethod
+    def _cache_args() -> list[str]:
+        """Share one package cache between install containers (HOME is /tmp, so pip's own cache dies with each one).
+
+        It is mounted only into containers that have the network, never into the ones that run the
+        AI-written tests or the app, so that code cannot tamper with cached packages.
+        """
+        try:
+            (CACHE_DIR / "pip").mkdir(parents=True, exist_ok=True)
+            (CACHE_DIR / "npm").mkdir(parents=True, exist_ok=True)
+        except OSError:
+            return []   # no cache is better than no install
+        return ["-v", f"{CACHE_DIR}:/cache", "-e", "PIP_CACHE_DIR=/cache/pip", "-e", "npm_config_cache=/cache/npm"]
 
     def docker_args(self, name: str, command: list[str], *, network: bool, detach: bool = False,
                     port: int | None = None, env: dict[str, str] | None = None) -> list[str]:

@@ -45,3 +45,21 @@ APP_TTL_SECONDS = int(os.getenv("APP_TTL_SECONDS", "900"))      # a preview stop
 APP_PUBLIC_HOST = os.getenv("APP_PUBLIC_HOST", "127.0.0.1")     # host the browser uses to open it
 APPS_DIR = Path(os.getenv("APPS_DIR") or Path(__file__).resolve().parent.parent / "jobs" / "apps")
 PROJECTS_DIR = Path(os.getenv("PROJECTS_DIR") or Path(__file__).resolve().parent.parent / "jobs" / "projects")
+
+# Time limits (seconds) for the slow commands. Lower them to fail fast on a hung install or test.
+# The main backend's DEVELOPER_AGENT_COMMAND_TIMEOUT_SECONDS must stay above INSTALL_TIMEOUT_SECONDS.
+def _seconds(name: str, default: int) -> int:
+    try:
+        value = int(os.getenv(name, default))
+    except ValueError:
+        return default
+    return value if value > 0 else default
+
+
+INSTALL_TIMEOUT_SECONDS = _seconds("INSTALL_TIMEOUT_SECONDS", 600)
+IMPORT_TIMEOUT_SECONDS = _seconds("IMPORT_TIMEOUT_SECONDS", 60)
+TEST_TIMEOUT_SECONDS = _seconds("TEST_TIMEOUT_SECONDS", 300)
+
+# Docker mode only: package downloads (pip / npm) are cached here and shared by install containers, so
+# the second install of a package does not download it again. Only install containers mount it.
+CACHE_DIR = Path(os.getenv("CACHE_DIR") or Path(__file__).resolve().parent.parent / "cache").resolve()

@@ -20,3 +20,6 @@ class DeveloperState(TypedDict):
     retries: int
      # final result label: "running", "success" or "failed"
     status: str
+
+    # seconds spent per step so far (llm, install, test, ...); see app/timing.py
+    timings: dict

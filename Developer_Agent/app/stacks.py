@@ -31,6 +31,7 @@ class Stack:
     steps: tuple[str, ...]                         # commands every check run executes, in order
     start: list[str] | None                        # how to start the app; None = cannot be started
     needs_env: str | None = None                   # folder that proves dependencies are installed
+    manifest: tuple[str, ...] = ()                 # dependency files; unchanged since the last install = skip install
     setup: list[str] | None = None                 # one-off command that creates that environment
     syntax: Callable | None = None                 # in-process check before anything is written
     structure: Callable | None = None              # in-process check after the files are written
@@ -113,6 +114,7 @@ STACKS: dict[str, Stack] = {
         image=PYTHON_IMAGE,
         rules=PYTHON_RULES,
         needs_env=".venv",
+        manifest=("requirements.txt",),
         setup=["{host_python}", "-m", "venv", ".venv"],
         commands={
             "install": ["{py}", "-m", "pip", "install", "--prefer-binary", "--disable-pip-version-check",
@@ -137,6 +139,7 @@ STACKS: dict[str, Stack] = {
         image=NODE_IMAGE,
         rules=NODE_RULES,
         needs_env="node_modules",
+        manifest=("package.json", "package-lock.json"),
         commands={
             "install": ["{npm}", "install", "--no-audit", "--no-fund", "--loglevel=error"],
             "check_imports": ["{node}", "-e", "require('./app')"],

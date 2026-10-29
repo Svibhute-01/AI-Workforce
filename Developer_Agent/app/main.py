@@ -12,6 +12,7 @@ import logging
 from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 
+from app import progress
 from app.apps import AppError, AppManager
 from app.config import QA_AUTO_REPAIR_ROUNDS, RUNNER_MODE, SERVICE_KEY
 from app.graph.builder import build_developer_graph
@@ -20,6 +21,7 @@ from app.projects import get_stack_id, set_stack_id
 from app.qa.run import run_qa
 from app.qa.reporting import write_report
 from app.stacks import STACKS, check_contract, detect_stack, get_stack, infer_stack_from_files
+from app.timing import format_timings
 from app.tools.runner import make_runner
 from app.tools.workspace import Workspace, WorkspaceError
 
@@ -152,7 +154,9 @@ def _execute_job(job_id: str, project_id: str, task: str, tech_stack: str, stack
         "validation_errors": [],
         "retries": 0,
         "status": "running",
+        "timings": {},
     }
+    progress.register(project_id, lambda message: jobs.update(job_id, log=message))
     try:
         for update in developer_graph.stream(state, stream_mode="updates"):
             for node, delta in update.items():
@@ -168,6 +172,9 @@ def _execute_job(job_id: str, project_id: str, task: str, tech_stack: str, stack
                     jobs.update(job_id, log="Retry limit reached")
 
         output = state["output"]
+        spent = format_timings(state.get("timings"))
+        if spent:   # answers "why was it slow?" straight from the job log
+            jobs.update(job_id, timings=state["timings"], log=f"Time spent: {spent}")
         jobs.update(
             job_id,
             status="success" if state["status"] == "success" else "failed",
@@ -183,6 +190,8 @@ def _execute_job(job_id: str, project_id: str, task: str, tech_stack: str, stack
     except Exception as exc:  # noqa: BLE001 - surface any failure to the caller
         logger.exception("Developer job %s crashed", job_id)
         jobs.update(job_id, status="error", errors=[f"{exc.__class__.__name__}: {exc}"], log="Crashed")
+    finally:
+        progress.unregister(project_id)
 
 
 @app.post("/projects/{project_id}/tasks", status_code=202)
@@ -319,9 +328,11 @@ def _run_developer_repair(
         ],
         "retries": 0,
         "status": "running",
+        "timings": {},
     }
 
     jobs.update(job_id, log=f"Starting Developer Agent repair round {round_number}")
+    progress.register(project_id, lambda message: jobs.update(job_id, log=f"Repair round {round_number}: {message}"))
     try:
         for update in developer_graph.stream(state, stream_mode="updates"):
             for node, delta in update.items():
@@ -349,6 +360,9 @@ def _run_developer_repair(
                 elif node == "give_up":
                     jobs.update(job_id, log=f"Repair round {round_number}: Developer retry limit reached")
 
+        spent = format_timings(state.get("timings"))
+        if spent:
+            jobs.update(job_id, log=f"Repair round {round_number} time spent: {spent}")
         output = state.get("output")
         return {
             "status": state.get("status", "failed"),
@@ -369,6 +383,8 @@ def _run_developer_repair(
             "errors": [f"{type(exc).__name__}: {exc}"],
             "attempts": state.get("retries", 0),
         }
+    finally:
+        progress.unregister(project_id)
 
 
 def _execute_qa(job_id: str, project_id: str, brief: dict) -> None:

@@ -9,3 +9,4 @@ workspaces/*
 !workspaces/.gitkeep
 jobs/*
 !jobs/.gitkeep
+cache/

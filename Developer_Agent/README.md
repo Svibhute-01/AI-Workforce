@@ -40,6 +40,22 @@ throw-away container with only the project folder mounted, memory/CPU limited, a
 for installs**. Docker mode needs Docker running. Do not switch a project between modes: a Python
 environment created in one cannot be used by the other (delete the project's `workspaces/` folder first).
 
+## Why a task can take minutes, and what is already done about it
+
+Each attempt is one Gemini call (it writes whole files, so output length decides its speed) followed by
+the checks: install, import check, tests, smoke check. A failed attempt repeats both, up to 3 times.
+
+* **See where the time went.** The job log ends with a line such as
+  `Time spent: llm 42.1s, install 80.3s, test 12.0s (total 134.4s)`, and the job record has a `timings`
+  object. The log also shows live steps ("Running install...") while the job is running.
+* **Unchanged dependencies are not installed again.** A retry that does not touch `requirements.txt`
+  (or `package.json` / `package-lock.json`) skips the install. The stamp lives inside `.venv` /
+  `node_modules`, is written only after a successful install, and is removed after a failed one.
+* **Docker mode shares a download cache** between install containers (`CACHE_DIR`). Containers that
+  run the tests or the app never mount it, so AI-written code cannot tamper with cached packages.
+  Local mode already uses the normal pip/npm cache of the current user.
+* **Lower the time limits** (see Setup) to fail fast on a hung install or test.
+
 ## Preview app
 
 `POST /projects/{id}/app/start` starts the generated app on a free port in `9100-9199`, bound to
@@ -69,8 +85,11 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload-dir app
 | `RUNNER_MODE` | `local` (default) or `docker` |
 | `PYTHON_IMAGE`, `NODE_IMAGE` | Docker images used in docker mode |
 | `SMOKE_CHECK` | `true` (default): start the app after the tests and request `/` |
+| `INSTALL_TIMEOUT_SECONDS`, `IMPORT_TIMEOUT_SECONDS`, `TEST_TIMEOUT_SECONDS` | Time limits for the slow commands (defaults 600 / 60 / 300). Keep the main backend's `DEVELOPER_AGENT_COMMAND_TIMEOUT_SECONDS` above the install limit |
+| `CACHE_DIR` | Docker mode: shared pip/npm download cache for install containers (default `cache/`) |
 | `APP_TTL_SECONDS`, `APP_PUBLIC_HOST` | Preview lifetime, and the host used in the preview URL |
 | `WORKSPACES_DIR`, `JOBS_DIR` | Where projects and job records are stored |
+| `LLM_CALL_ATTEMPTS` | Tries per model call when the connection drops or the service is busy (default 3; 1 = no retry) |
 
 If `DEVELOPER_SERVICE_KEY` is empty the API is unauthenticated, so keep it bound to `127.0.0.1`.
 
@@ -84,6 +103,13 @@ If `DEVELOPER_SERVICE_KEY` is empty the API is unauthenticated, so keep it bound
 | `POST /projects/{id}/run` | Run an allowlisted command (`install`, `check_imports`, `test`) the project's stack supports |
 | `GET /projects/{id}/stack`, `GET /stacks` | The project's stack and its commands; the supported stacks |
 | `GET/POST /projects/{id}/app`, `/app/start`, `/app/stop` | Preview app status, start, stop |
+
+## Troubleshooting: "ReadError ... WinError 10054" / "connection forcibly closed"
+
+The connection to the model service was cut while a long answer was being written. It is usually your
+network (VPN, proxy, antivirus/firewall, flaky Wi-Fi), not the code. A dropped call is now retried
+automatically (`LLM_CALL_ATTEMPTS`) and the retry shows in the job log. If it keeps failing, try another
+network or turn the VPN off; a faster model also helps, because shorter calls are cut less often.
 
 ## Tests
 
