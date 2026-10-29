@@ -34,7 +34,7 @@ async function request(path, options = {}) {
   return payload
 }
 
-// Downloads a file the API answers with (a CSV), which request() cannot do because it expects JSON.
+// Downloads a file the API answers with (a CSV or ZIP), which request() cannot do because it expects JSON.
 async function downloadCsv(path, filename) {
   const token = localStorage.getItem('accessToken')
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -208,6 +208,10 @@ export const apiService = {
     // Downloads a CSV of every run. It bypasses request() because the reply is a file, not JSON.
     exportRuns: (projectId) =>
       downloadCsv(`/projects/${projectId}/developer/runs/export`, `developer-runs-project-${projectId}.csv`),
+
+    // Downloads the generated project as a ZIP file.
+    downloadZip: (projectId) =>
+      downloadCsv(`/projects/${projectId}/developer/workspace/download`, `project-${projectId}-code.zip`),
 
     runCommand: (projectId, command) =>
       request(`/projects/${projectId}/developer/commands`, {

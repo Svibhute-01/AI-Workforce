@@ -9,7 +9,7 @@ import RunPanel from '../components/developer/RunPanel'
 import TaskList from '../components/developer/TaskList'
 import { buildTree } from '../components/developer/treeUtils'
 import { languageFor } from '../components/developer/syntax'
-import { latestByTask } from '../components/developer/qaUtils'
+import { canSendDefects, latestByTask } from '../components/developer/qaUtils'
 import { applyTheme } from '../utils/theme'
 
 const COMMANDS = [
@@ -24,6 +24,7 @@ const RUN_COLOR = { PROCESSING: 'text-ide-info', COMPLETED: 'text-ide-success', 
 const DOT_COLOR = { PROCESSING: 'bg-ide-info animate-pulse', COMPLETED: 'bg-ide-success', FAILED: 'bg-ide-danger' }
 
 const NO_APP = { running: false, log: '', note: '' }
+const MAX_LOOP_ROUNDS = 3   // QA -> Developer -> QA cycles before the demo loop gives up
 
 const toolbarButton =
   'flex items-center gap-1.5 px-2.5 py-1 rounded text-[13px] border border-ide-border text-ide-text2 hover:bg-ide-hover disabled:opacity-40 disabled:hover:bg-transparent'
@@ -44,6 +45,7 @@ function Developer() {
   const [startingTask, setStartingTask] = useState('')
   const [forcePrompt, setForcePrompt] = useState(null)
   const [exporting, setExporting] = useState(false)
+  const [zipping, setZipping] = useState(false)
   const [error, setError] = useState('')
   const [bottomTab, setBottomTab] = useState('run')
   const [panelOpen, setPanelOpen] = useState(true)
@@ -56,6 +58,7 @@ function Developer() {
   const [qaRuns, setQaRuns] = useState([])
   const [qaSending, setQaSending] = useState(false)
   const [qaExporting, setQaExporting] = useState(false)
+  const [loop, setLoop] = useState(null)   // QA <-> Developer demo loop: { taskId, round, phase, qaRunId, devRunId, note }
   const [fullscreen, setFullscreen] = useState(Boolean(document.fullscreenElement))
   const navigate = useNavigate()
 
@@ -72,6 +75,7 @@ function Developer() {
   const activeQa = qaRuns[0] || null
   const qaWorking = activeQa?.status === 'PROCESSING'
   const working = developerWorking || qaWorking   // both agents use the project's files, so only one runs at a time
+  const loopActive = Boolean(loop && loop.phase !== 'done')
   const qaByTask = useMemo(() => latestByTask(qaRuns), [qaRuns])
   const tree = useMemo(() => buildTree(files), [files])
 
@@ -281,6 +285,49 @@ function Developer() {
     }
   }
 
+  // Demo loop: QA tests -> on FAIL the defects go to the Developer -> when it finishes QA runs again.
+  const beginQaRound = async (taskId, round) => {
+    setLoop({ taskId, round, phase: 'starting', note: `Round ${round}: starting QA...` })
+    try {
+      const started = await apiService.qa.run(projectId, taskId)
+      setQaRuns((runs) => [started, ...runs])
+      setBottomTab('qa')
+      setPanelOpen(true)
+      setLoop({ taskId, round, phase: 'qa', qaRunId: started.id, note: `Round ${round}: QA is testing the app...` })
+    } catch (requestError) {
+      setError(requestError.message)
+      setLoop({ taskId, round, phase: 'done', note: 'Loop stopped: QA could not start.' })
+    }
+  }
+
+  const startLoop = (task) => {
+    setError('')
+    beginQaRound(task.task_id, 1)
+  }
+
+  useEffect(() => {
+    if (!loop) return
+    const stop = (note) => setLoop((current) => ({ ...current, phase: 'done', note }))
+
+    if (loop.phase === 'qa' && activeQa?.id === loop.qaRunId && activeQa.status !== 'PROCESSING') {
+      if (activeQa.verdict === 'PASS') return stop(`QA passed in round ${loop.round}. Task completed.`)
+      if (!canSendDefects(activeQa)) return stop(`QA ended with "${activeQa.verdict || activeQa.status}". Loop stopped.`)
+      if (loop.round >= MAX_LOOP_ROUNDS) return stop(`Still failing after ${MAX_LOOP_ROUNDS} rounds. Loop stopped.`)
+      setLoop({ ...loop, phase: 'sending', note: `Round ${loop.round}: QA failed. Sending defects to the Developer...` })
+      apiService.qa.sendDefects(projectId, activeQa.id)
+        .then((started) => {
+          setRun(started)
+          setQaRuns((runs) => runs.map((item) => (item.id === activeQa.id ? { ...item, defects_sent: true } : item)))
+          setBottomTab('run')
+          setLoop({ ...loop, phase: 'dev', devRunId: started.id, note: `Round ${loop.round}: Developer is fixing the defects...` })
+        })
+        .catch((requestError) => { setError(requestError.message); stop('Loop stopped: defects could not be sent.') })
+    } else if (loop.phase === 'dev' && run?.id === loop.devRunId && run.status !== 'PROCESSING') {
+      if (run.status !== 'COMPLETED') return stop('Developer could not fix the defects. Loop stopped.')
+      beginQaRound(loop.taskId, loop.round + 1)
+    }
+  }, [loop, activeQa, run])   // eslint-disable-line react-hooks/exhaustive-deps
+
   const sendDefects = async () => {
     setQaSending(true)
     setError('')
@@ -342,6 +389,18 @@ function Developer() {
       setError(requestError.message)
     } finally {
       setExporting(false)
+    }
+  }
+
+  const downloadZip = async () => {
+    setZipping(true)
+    setError('')
+    try {
+      await apiService.developer.downloadZip(projectId)
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setZipping(false)
     }
   }
 
@@ -452,6 +511,16 @@ function Developer() {
         </div>
       )}
 
+      {loop && (
+        <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2 text-[13px] bg-ide-info/10 border-b border-ide-border text-ide-text">
+          <RefreshCw className={`w-4 h-4 flex-shrink-0 ${loopActive ? 'animate-spin' : ''}`} />
+          <span className="flex-1">QA loop {loop.taskId}: {loop.note}</span>
+          <button onClick={() => (loopActive ? setLoop({ ...loop, phase: 'done', note: 'Stopped by you.' }) : setLoop(null))} className="text-ide-muted hover:text-ide-text">
+            {loopActive ? 'Stop' : 'Dismiss'}
+          </button>
+        </div>
+      )}
+
       {forcePrompt && (
         <div className="flex-shrink-0 flex flex-wrap items-center gap-3 px-4 py-2 text-[13px] bg-ide-warn/10 border-b border-ide-warn/40 text-ide-warn">
           <span className="flex-1">{forcePrompt.message}{forcePrompt.message.endsWith('.') ? '' : '.'}</span>
@@ -475,12 +544,13 @@ function Developer() {
         <aside className="w-full lg:w-72 flex-shrink-0 max-h-72 lg:max-h-none border-b lg:border-b-0 lg:border-r border-ide-border">
           <TaskList
             tasks={tasks}
-            working={working}
+            working={working || loopActive}
             startingTask={startingTask}
             activeTaskId={developerWorking ? run?.task_id : qaWorking ? activeQa?.task_id : null}
             onStart={startTask}
             qaByTask={qaByTask}
             onQa={startQa}
+            onLoop={startLoop}
           />
         </aside>
 
@@ -564,8 +634,15 @@ function Developer() {
 
         <aside className="w-full lg:w-64 flex-shrink-0 max-h-72 lg:max-h-none flex flex-col min-h-0 border-t lg:border-t-0 lg:border-l border-ide-border">
           <div className="px-3 py-2 border-b border-ide-border text-[11px] uppercase tracking-wide text-ide-muted flex items-center justify-between">
-            <span>Files</span>
-            <span>{files.length}</span>
+            <span>Files · {files.length}</span>
+            <button
+              onClick={downloadZip}
+              disabled={!files.length || working || loopActive || zipping}
+              title="Download the generated project as a ZIP file"
+              className="flex items-center gap-1 normal-case text-ide-text2 hover:text-ide-text disabled:opacity-40"
+            >
+              <Download className="w-3.5 h-3.5" />{zipping ? 'Zipping...' : 'ZIP'}
+            </button>
           </div>
           <div className="flex-1 overflow-auto min-h-0">
             <FileTree tree={tree} selectedPath={activePath} onSelect={openFile} />

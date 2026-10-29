@@ -6,6 +6,8 @@ task plus the Architect's design into the agent's instructions, and records ever
 an ``AgentRun`` so it appears next to the other agents' runs.
 """
 
+import io
+import zipfile
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -36,6 +38,8 @@ from ..schemas_developer import (
 router = APIRouter(prefix="/api/projects/{project_id}/developer", tags=["developer"])
 
 ACTIVE = "PROCESSING"
+# Files the running app leaves behind (databases, bytecode, logs). They are not source code and not text.
+ZIP_SKIP_SUFFIXES = (".db", ".sqlite", ".sqlite3", ".pyc", ".log")
 
 
 def _call(fn, *args):
@@ -153,6 +157,39 @@ def read_workspace_file(
 ):
     project = get_project_or_404(project_id, user, db)
     return FileContentResponse(path=path, content=_call(client.read_file, workspace_id(project.id), path))
+
+
+@router.get("/workspace/download")
+def download_workspace(
+    project_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    client: DeveloperAgentClient = Depends(get_developer_client),
+):
+    """Download the generated project as a ZIP file."""
+    project = get_project_or_404(project_id, user, db)
+    workspace = workspace_id(project.id)
+    paths = [
+        p for p in _call(client.list_files, workspace)
+        if not p.startswith(("/", "\\")) and ".." not in p.split("/") and not p.lower().endswith(ZIP_SKIP_SUFFIXES)
+    ]
+    if not paths:
+        raise HTTPException(status_code=409, detail="There are no files to download yet. Run a Developer task first.")
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        for path in paths:
+            try:
+                content = client.read_file(workspace, path)
+            except DeveloperServiceError as exc:
+                if exc.status_code == 503:
+                    raise HTTPException(status_code=503, detail=exc.detail) from exc
+                continue   # a binary or unreadable file: leave it out of the ZIP
+            archive.writestr(f"project-{project.id}/{path}", content)
+    return Response(
+        content=buffer.getvalue(),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="project-{project.id}-code.zip"'},
+    )
 
 
 @router.post("/tasks/{task_id}/run", response_model=DeveloperRunResponse, status_code=202)

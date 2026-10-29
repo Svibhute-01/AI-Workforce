@@ -179,6 +179,15 @@ def test_workspace_files_and_commands(client, project, fake):
     assert client.post(f"{base}/commands", json={"command": "rm -rf /"}, headers=project.headers).status_code == 422
 
 
+def test_workspace_can_be_downloaded_as_a_zip(client, project, fake):
+    import io
+    import zipfile
+
+    response = client.get(f"{BASE.format(project.id)}/workspace/download", headers=project.headers)
+    assert response.status_code == 200 and response.headers["content-type"] == "application/zip"
+    assert zipfile.ZipFile(io.BytesIO(response.content)).namelist() == [f"project-{project.id}/app/main.py"]
+
+
 def test_commands_are_refused_while_the_agent_is_working(client, project, fake):
     start(client, project)
     response = client.post(f"{BASE.format(project.id)}/commands", json={"command": "test"}, headers=project.headers)

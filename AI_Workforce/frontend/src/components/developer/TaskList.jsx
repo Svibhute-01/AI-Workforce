@@ -1,4 +1,4 @@
-import { Play, ShieldCheck } from 'lucide-react'
+import { Play, RefreshCw, ShieldCheck } from 'lucide-react'
 import { verdictInfo } from './qaUtils'
 
 const DOT = {
@@ -9,7 +9,7 @@ const DOT = {
 const QA_TEXT = { success: 'text-ide-success', danger: 'text-ide-danger', warn: 'text-ide-warn', muted: 'text-ide-muted' }
 const LABEL = { TODO: 'Todo', IN_PROGRESS: 'In progress', COMPLETED: 'Completed' }
 
-function TaskList({ tasks, working, startingTask, activeTaskId, onStart, qaByTask = {}, onQa = () => {} }) {
+function TaskList({ tasks, working, startingTask, activeTaskId, onStart, qaByTask = {}, onQa = () => {}, onLoop = () => {} }) {
   const done = tasks.filter((task) => task.status === 'COMPLETED').length
   const percent = tasks.length ? Math.round((done / tasks.length) * 100) : 0
 
@@ -56,6 +56,14 @@ function TaskList({ tasks, working, startingTask, activeTaskId, onStart, qaByTas
                   className="flex-shrink-0 w-7 h-7 rounded flex items-center justify-center border border-ide-border text-ide-text2 hover:bg-ide-hover disabled:opacity-40 disabled:hover:bg-transparent"
                 >
                   <ShieldCheck className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => onLoop(task)}
+                  disabled={working || Boolean(startingTask)}
+                  title="QA loop: test, send failed criteria back to the Developer, and re-test (up to 3 rounds)"
+                  className="flex-shrink-0 w-7 h-7 rounded flex items-center justify-center border border-ide-border text-ide-text2 hover:bg-ide-hover disabled:opacity-40 disabled:hover:bg-transparent"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
                 </button>
                 <button
                   onClick={() => onStart(task)}
