@@ -1,19 +1,14 @@
-function ProgressBar({ progress, showLabel = true, size = 'md' }) {
-  const heightClass = {
-    sm: 'h-2',
-    md: 'h-3',
-    lg: 'h-4',
-  }[size]
+function ProgressBar({ progress, showLabel = true, size = 'md', tone = 'default' }) {
+  const value = Math.max(0, Math.min(100, Number(progress) || 0))
+  const heightClass = { sm: 'h-2', md: 'h-2.5', lg: 'h-3.5' }[size]
+  const toneClass = tone === 'alert' ? 'alert' : tone === 'leaf' ? 'leaf' : tone === 'cool' ? 'cool' : ''
 
   return (
     <div className="flex items-center gap-3">
-      <div className={`flex-1 bg-gray-200 rounded-full overflow-hidden ${heightClass}`}>
-        <div
-          className="bg-primary h-full rounded-full transition-all duration-300"
-          style={{ width: `${progress}%` }}
-        ></div>
+      <div className={`bt-track flex-1 ${heightClass}`} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={value}>
+        <div className={`bt-fill ${toneClass}`} style={{ width: `${value}%` }}></div>
       </div>
-      {showLabel && <span className="text-sm font-medium text-text-primary min-w-max">{progress}%</span>}
+      {showLabel && <span className="min-w-max text-xs font-bold tabular-nums text-text-primary">{value}%</span>}
     </div>
   )
 }

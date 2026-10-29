@@ -117,7 +117,7 @@ function OverviewDiagram({ diagram }) {
         >
           <defs>
             <marker id="arch-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-              <path d="M 0 0 L 10 5 L 0 10 z" fill="#8b86a8" />
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#8C7A3F" />
             </marker>
           </defs>
 
@@ -127,9 +127,9 @@ function OverviewDiagram({ diagram }) {
             return (
               <g key={edge.id}>
                 <title>{edge.label}</title>
-                <path d={d} fill="none" stroke="#8b86a8" strokeWidth="1.6" markerEnd="url(#arch-arrow)" />
-                <rect x={lx - label.length * 3.1 - 5} y={ly - 9} width={label.length * 6.2 + 10} height="17" rx="4" fill="#ffffff" stroke="#e5e0ff" />
-                <text x={lx} y={ly + 3.5} textAnchor="middle" fontSize="10" fill="#555">{label}</text>
+                <path d={d} fill="none" stroke="#8C7A3F" strokeWidth="1.6" markerEnd="url(#arch-arrow)" />
+                <rect x={lx - label.length * 3.1 - 5} y={ly - 9} width={label.length * 6.2 + 10} height="17" rx="4" fill="#FFF9DF" stroke="#E9C65E" />
+                <text x={lx} y={ly + 3.5} textAnchor="middle" fontSize="10" fill="#5C5338">{label}</text>
               </g>
             )
           })}
@@ -141,10 +141,10 @@ function OverviewDiagram({ diagram }) {
             return (
               <g key={node.id}>
                 <title>{`${node.label} (${node.type}, ${node.grounding})`}</title>
-                <rect x={x} y={y} width={NODE_W} height={NODE_H} rx="10" fill="#ffffff" stroke={color} strokeWidth="2" strokeDasharray={certain ? undefined : '6 4'} />
+                <rect x={x} y={y} width={NODE_W} height={NODE_H} rx="10" fill="#FFF9DF" stroke={color} strokeWidth="2" strokeDasharray={certain ? undefined : '6 4'} />
                 <rect x={x} y={y} width="7" height={NODE_H} rx="3" fill={color} />
-                <text x={x + 20} y={y + 26} fontSize="13" fontWeight="600" fill="#1a1a1a">{clip(node.label, 22)}</text>
-                <text x={x + 20} y={y + 45} fontSize="10.5" fill="#666666">{node.id} · {styleFor(node.type).label}</text>
+                <text x={x + 20} y={y + 26} fontSize="13" fontWeight="600" fill="#34312B">{clip(node.label, 22)}</text>
+                <text x={x + 20} y={y + 45} fontSize="10.5" fill="#6F6446">{node.id} · {styleFor(node.type).label}</text>
               </g>
             )
           })}

@@ -5,7 +5,7 @@ const VALID = ['light', 'dark', 'system']
 
 export function getStoredTheme() {
   const stored = localStorage.getItem(STORAGE_KEY)
-  return VALID.includes(stored) ? stored : 'system'
+  return VALID.includes(stored) ? stored : 'light'
 }
 
 export function resolveTheme(preference) {
@@ -30,6 +30,9 @@ export function initTheme() {
     if (getStoredTheme() === 'system') applyTheme('system')
   })
   if (localStorage.getItem('accessToken')) {
-    apiService.settings.getPreferences().then((prefs) => applyTheme(prefs.theme)).catch(() => {})
+    apiService.settings.getPreferences().then((prefs) => {
+      if (prefs.theme === 'system' && !localStorage.getItem(STORAGE_KEY)) return
+      applyTheme(prefs.theme)
+    }).catch(() => {})
   }
 }

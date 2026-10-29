@@ -41,7 +41,7 @@ function Sequence({ model, selected, highlightIds, onSelect }) {
     <g>
       <defs>
         <marker id="seq-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto">
-          <path d="M 0 0 L 10 5 L 0 10 z" fill="#5B2DD8" />
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#5B4A1A" />
         </marker>
       </defs>
 
@@ -57,12 +57,12 @@ function Sequence({ model, selected, highlightIds, onSelect }) {
             onMouseEnter={() => setHover(p.id)} onMouseLeave={() => setHover(null)} onClick={() => select(p.ref)}>
             <title>{`${p.label} — ${p.sublabel}`}</title>
             <line x1={x} y1={HEAD_H} x2={x} y2={bottom} stroke={c} strokeOpacity="0.45" strokeWidth="1.6" strokeDasharray="5 5" />
-            {(isSelected || marked) && <rect x={x - HEAD_W / 2 - 5} y={-5} width={HEAD_W + 10} height={HEAD_H + 10} rx="13" fill="none" stroke={isSelected ? '#5B2DD8' : '#f59e0b'} strokeWidth="2.6" strokeDasharray={isSelected ? undefined : '5 3'} />}
-            <rect x={x - HEAD_W / 2} y="0" width={HEAD_W} height={HEAD_H} rx="9" fill="#ffffff" stroke={c} strokeWidth="2" />
+            {(isSelected || marked) && <rect x={x - HEAD_W / 2 - 5} y={-5} width={HEAD_W + 10} height={HEAD_H + 10} rx="13" fill="none" stroke={isSelected ? '#5B4A1A' : '#B65A8A'} strokeWidth="2.6" strokeDasharray={isSelected ? undefined : '5 3'} />}
+            <rect x={x - HEAD_W / 2} y="0" width={HEAD_W} height={HEAD_H} rx="9" fill="#FFF9DF" stroke={c} strokeWidth="2" />
             <rect x={x - HEAD_W / 2} y="0" width="7" height={HEAD_H} rx="3" fill={c} />
             {p.kind === 'actor' && <g stroke={c} strokeWidth="1.6" fill="none"><circle cx={x - HEAD_W / 2 + 22} cy="18" r="5" /><path d={`M ${x - HEAD_W / 2 + 22} 23 v 12 M ${x - HEAD_W / 2 + 14} 28 h 16 M ${x - HEAD_W / 2 + 22} 35 l -6 9 M ${x - HEAD_W / 2 + 22} 35 l 6 9`} strokeLinecap="round" /></g>}
-            <text x={x + (p.kind === 'actor' ? 10 : 6)} y="24" fontSize="12.5" fontWeight="700" textAnchor="middle" fill="#1a1a1a">{clip(p.label, 20)}</text>
-            <text x={x + (p.kind === 'actor' ? 10 : 6)} y="42" fontSize="10" textAnchor="middle" fill="#666666">{clip(p.sublabel, 26)}</text>
+            <text x={x + (p.kind === 'actor' ? 10 : 6)} y="24" fontSize="12.5" fontWeight="700" textAnchor="middle" fill="#34312B">{clip(p.label, 20)}</text>
+            <text x={x + (p.kind === 'actor' ? 10 : 6)} y="42" fontSize="10" textAnchor="middle" fill="#6F6446">{clip(p.sublabel, 26)}</text>
           </g>
         )
       })}
@@ -84,15 +84,15 @@ function Sequence({ model, selected, highlightIds, onSelect }) {
           <g key={m.id} data-message={m.id} opacity={live ? 1 : 0.2}>
             <title>{m.tooltip || m.label}</title>
             {self ? (
-              <path d={`M ${fx + 4} ${y - 10} h 42 v 22 h -38`} fill="none" stroke="#5B2DD8" strokeWidth="1.8" markerEnd="url(#seq-arrow)" />
+              <path d={`M ${fx + 4} ${y - 10} h 42 v 22 h -38`} fill="none" stroke="#5B4A1A" strokeWidth="1.8" markerEnd="url(#seq-arrow)" />
             ) : (
-              <line x1={x1} y1={y} x2={x2} y2={y} stroke="#5B2DD8" strokeWidth="1.9" markerEnd="url(#seq-arrow)" />
+              <line x1={x1} y1={y} x2={x2} y2={y} stroke="#5B4A1A" strokeWidth="1.9" markerEnd="url(#seq-arrow)" />
             )}
             <circle cx={fx + (self ? 4 : 18 * dir)} cy={y} r="0" />
             {lines.map((line, k) => (
-              <text key={k} x={self ? fx + 54 : mid} y={y - 8 - (lines.length - 1 - k) * 13} fontSize="11" textAnchor={self ? 'start' : 'middle'} fill="#333333">{k === 0 ? `${badge}. ${line}` : line}</text>
+              <text key={k} x={self ? fx + 54 : mid} y={y - 8 - (lines.length - 1 - k) * 13} fontSize="11" textAnchor={self ? 'start' : 'middle'} fill="#34312B">{k === 0 ? `${badge}. ${line}` : line}</text>
             ))}
-            {m.detail && <text x={self ? fx + 54 : mid} y={y + 17} fontSize="10" fontFamily={MONO} textAnchor={self ? 'start' : 'middle'} fill="#2563eb">{clip(m.detail, 40)}</text>}
+            {m.detail && <text x={self ? fx + 54 : mid} y={y + 17} fontSize="10" fontFamily={MONO} textAnchor={self ? 'start' : 'middle'} fill="#5B8FB9">{clip(m.detail, 40)}</text>}
           </g>
         )
       })}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   User, Lock, Palette, Sparkles, Bell, Shield, Plug, AlertTriangle, Sun, Moon, Monitor,
   Eye, EyeOff, LogOut, Github, Slack, ListChecks, RefreshCw, Loader2, CheckCircle2, XCircle,
@@ -113,7 +113,9 @@ function PasswordField({ label, value, onChange, autoComplete }) {
 
 function Settings() {
   const navigate = useNavigate()
-  const [active, setActive] = useState('profile')
+  const [searchParams] = useSearchParams()
+  const initialSection = SECTIONS.some((section) => section.id === searchParams.get('section')) ? searchParams.get('section') : 'profile'
+  const [active, setActive] = useState(initialSection)
   const [data, setData] = useState({ profile: null, preferences: null, ai: null, security: null, integrations: null })
   const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(true)
@@ -158,7 +160,7 @@ function Settings() {
     setData(nextData)
     setErrors(nextErrors)
     if (nextData.profile) setName(nextData.profile.display_name)
-    if (nextData.preferences) applyTheme(nextData.preferences.theme)
+    if (nextData.preferences && (nextData.preferences.theme !== 'system' || localStorage.getItem('theme'))) applyTheme(nextData.preferences.theme)
     setLoading(false)
   }, [])
 
@@ -354,7 +356,7 @@ function Settings() {
             {unavailable('preferences', prefs && (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl" role="radiogroup" aria-label="Theme">
                 {THEME_OPTIONS.map(({ value, label, icon: Icon, hint }) => {
-                  const selected = (prefs.theme || getStoredTheme()) === value
+                  const selected = (localStorage.getItem('theme') ? (prefs.theme || getStoredTheme()) : getStoredTheme()) === value
                   return (
                     <button key={value} type="button" role="radio" aria-checked={selected}
                       disabled={pendingKey === 'theme'} onClick={() => changeTheme(value)}

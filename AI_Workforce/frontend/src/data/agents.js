@@ -28,30 +28,3 @@ export const agents = [
     status: 'active',
   },
 ]
-
-export const agentActivities = [
-  {
-    id: 1,
-    agent: 'Requirement Analyst AI',
-    activity: 'Extracted 25 requirements from project specification',
-    timestamp: '2h ago',
-  },
-  {
-    id: 2,
-    agent: 'Project Manager AI',
-    activity: 'Created Sprint 1 with 18 tasks',
-    timestamp: '5h ago',
-  },
-  {
-    id: 3,
-    agent: 'Developer AI',
-    activity: 'Generated API implementation',
-    timestamp: '1d ago',
-  },
-  {
-    id: 4,
-    agent: 'QA AI',
-    activity: 'Generated 45 test cases',
-    timestamp: '2d ago',
-  },
-]

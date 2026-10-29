@@ -55,7 +55,15 @@ async function downloadCsv(path, filename) {
   URL.revokeObjectURL(url)
 }
 
+async function checkHealth() {
+  const origin = new URL(API_BASE_URL, window.location.origin).origin
+  const response = await fetch(`${origin}/health`, { cache: 'no-store' })
+  return response.ok
+}
+
 export const apiService = {
+  health: checkHealth,
+
   auth: {
     login: (data) =>
       request('/auth/login', {

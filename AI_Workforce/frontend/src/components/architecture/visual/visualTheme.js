@@ -3,22 +3,22 @@ import { TYPE_STYLE } from '../diagramStyle'
 // Colours for every kind of diagram node. Component types reuse the palette of the existing
 // architecture diagram so the same component looks the same everywhere.
 const EXTRA = {
-  ACTOR: '#334155', SYSTEM: '#5B2DD8', INTERFACE: '#c026d3', TABLE: '#059669',
-  CONTROLLER: '#2563eb', SERVICE: '#0891b2', REPOSITORY: '#059669', MODEL: '#d97706', MIDDLEWARE: '#7c3aed',
-  CLIENT: '#64748b', UI_COMPONENT: '#5B2DD8', UTILITY: '#6b7280',
-  GET: '#0891b2', POST: '#059669', PUT: '#d97706', PATCH: '#d97706', DELETE: '#dc2626',
-  REQUEST: '#2563eb', RESPONSE: '#0891b2', DTO: '#6b7280',
-  CLIENT_DEVICE: '#5B2DD8', SERVER: '#0891b2', CONTAINER: '#2563eb', MANAGED_SERVICE: '#7c3aed', CLOUD_SERVICE: '#64748b',
+  ACTOR: '#5B4A1A', SYSTEM: '#5B4A1A', INTERFACE: '#E0B83F', TABLE: '#6E9A55',
+  CONTROLLER: '#5B8FB9', SERVICE: '#3E9E8F', REPOSITORY: '#6E9A55', MODEL: '#C9697A', MIDDLEWARE: '#7C6A2B',
+  CLIENT: '#8C8672', UI_COMPONENT: '#5B4A1A', UTILITY: '#8C8672',
+  GET: '#3E9E8F', POST: '#6E9A55', PUT: '#C9697A', PATCH: '#C9697A', DELETE: '#C0463E',
+  REQUEST: '#5B8FB9', RESPONSE: '#3E9E8F', DTO: '#8C8672',
+  CLIENT_DEVICE: '#5B4A1A', SERVER: '#3E9E8F', CONTAINER: '#5B8FB9', MANAGED_SERVICE: '#7C6A2B', CLOUD_SERVICE: '#8C8672',
 }
 
-export const toneColor = (tone) => EXTRA[tone] || TYPE_STYLE[tone]?.color || '#6b7280'
+export const toneColor = (tone) => EXTRA[tone] || TYPE_STYLE[tone]?.color || '#8C8672'
 
 export const EDGE_STYLE = {
-  call: { color: '#8b86a8', width: 1.8, dash: undefined, end: 'arrow' },
-  flow: { color: '#5B2DD8', width: 2.2, dash: undefined, end: 'arrow' },
-  dep: { color: '#7c3aed', width: 1.4, dash: '5 3', end: 'arrow' },
-  impl: { color: '#c026d3', width: 1.4, dash: '5 3', end: 'hollow' },
-  fk: { color: '#059669', width: 1.6, dash: undefined, end: 'none' },
+  call: { color: '#8C7A3F', width: 1.8, dash: undefined, end: 'arrow' },
+  flow: { color: '#5B4A1A', width: 2.2, dash: undefined, end: 'arrow' },
+  dep: { color: '#7C6A2B', width: 1.4, dash: '5 3', end: 'arrow' },
+  impl: { color: '#E0B83F', width: 1.4, dash: '5 3', end: 'hollow' },
+  fk: { color: '#6E9A55', width: 1.6, dash: undefined, end: 'none' },
 }
 
 export const KIND_BADGE = {

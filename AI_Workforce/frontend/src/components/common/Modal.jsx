@@ -1,37 +1,40 @@
+import { useEffect } from 'react'
 import { X } from 'lucide-react'
 
-function Modal({ isOpen, title, children, onClose, onSubmit, submitText = 'Create' }) {
+function Modal({ isOpen, title, children, onClose, onSubmit, submitText = 'Create', submitting = false }) {
+  useEffect(() => {
+    if (!isOpen) return undefined
+    const onKey = (event) => { if (event.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [isOpen, onClose])
+
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-lg max-w-md w-full mx-4">
-        <div className="flex items-center justify-between p-6 border-b border-border-light">
-          <h2 className="text-lg font-bold text-text-primary">{title}</h2>
+    <div className="bt-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={title}>
+      <div className="card bt-page flex max-h-full w-full max-w-md flex-col">
+        <div className="flex shrink-0 items-center justify-between border-b border-border-light px-6 py-4">
+          <h2 className="text-lg font-extrabold text-text-primary">{title}</h2>
           <button
             onClick={onClose}
-            className="text-text-secondary hover:text-text-primary transition-colors"
+            aria-label="Close"
+            className="rounded-lg p-1 text-text-secondary transition-colors hover:bg-brand-soft hover:text-text-primary"
           >
-            <X className="w-5 h-5" />
+            <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="p-6">
+        <div className="overflow-y-auto p-6">
           {children}
         </div>
 
-        <div className="flex gap-3 p-6 border-t border-border-light">
-          <button
-            onClick={onClose}
-            className="btn-secondary flex-1"
-          >
+        <div className="flex shrink-0 gap-3 border-t border-border-light px-6 py-4">
+          <button onClick={onClose} className="btn-secondary flex-1">
             Cancel
           </button>
-          <button
-            onClick={onSubmit}
-            className="btn-primary flex-1"
-          >
-            {submitText}
+          <button onClick={onSubmit} disabled={submitting} className="btn-primary flex-1">
+            {submitting ? 'Saving...' : submitText}
           </button>
         </div>
       </div>

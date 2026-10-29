@@ -6,6 +6,9 @@ import {
   ClipboardList, Info,
 } from 'lucide-react'
 import apiService from '../services/api'
+import BrandMark from '../components/brand/BrandMark'
+import { fmtDate, fmtDuration, timeAgo } from '../utils/format'
+import { STATUS_META } from '../utils/reportModel'
 
 /* ------------------------------ helpers ------------------------------ */
 
@@ -14,55 +17,37 @@ const greeting = () => {
   return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'
 }
 
-const timeAgo = (iso) => {
-  if (!iso) return 'Never'
-  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000)
-  if (s < 60) return 'Just now'
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`
-  if (s < 86400 * 30) return `${Math.floor(s / 86400)}d ago`
-  return new Date(iso).toLocaleDateString()
-}
-
-const fmtDuration = (sec) => {
-  if (sec == null) return '—'
-  if (sec < 60) return `${Math.round(sec)}s`
-  return `${Math.floor(sec / 60)}m ${Math.round(sec % 60)}s`
-}
-
-const fmtDate = (d) => (d ? new Date(`${d}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '—')
-
-const STATUS_COLORS = { TODO: '#f59e0b', IN_PROGRESS: '#3b82f6', COMPLETED: '#10b981' }
+const STATUS_COLORS = Object.fromEntries(Object.entries(STATUS_META).map(([key, meta]) => [key, meta.color]))
 const PRIORITY_STYLE = {
-  HIGH: 'bg-red-50 text-red-700',
-  MEDIUM: 'bg-amber-50 text-amber-700',
-  LOW: 'bg-emerald-50 text-emerald-700',
+  HIGH: 'badge-danger',
+  MEDIUM: 'badge-warning',
+  LOW: 'badge-success',
 }
 const RUN_STYLE = {
   COMPLETED: { dot: 'bg-emerald-500', text: 'text-emerald-700', label: 'Completed' },
   FAILED: { dot: 'bg-red-500', text: 'text-red-700', label: 'Failed' },
-  PROCESSING: { dot: 'bg-blue-500 animate-pulse', text: 'text-blue-700', label: 'Running' },
+  PROCESSING: { dot: 'bg-brand-golden animate-pulse', text: 'text-yellow-800', label: 'Running' },
 }
 const runStyle = (s) => RUN_STYLE[s] || RUN_STYLE.PROCESSING
 const AGENT_ICON = { requirements_analyst: ClipboardList, project_manager: Layers, developer: Code2, qa: ShieldCheck }
 const ATTENTION_STYLE = {
   high: 'border-red-200 bg-red-50 text-red-700',
   medium: 'border-amber-200 bg-amber-50 text-amber-700',
-  info: 'border-blue-200 bg-blue-50 text-blue-700',
+  info: 'border-border-light bg-primary-light text-primary',
 }
 
 /* ---------------------------- small building blocks ---------------------------- */
 
-const Skeleton = ({ className = '' }) => <div className={`animate-pulse rounded-lg bg-gray-200/70 ${className}`} />
+const Skeleton = ({ className = '' }) => <div className={`bt-skeleton ${className}`} aria-hidden="true" />
 
 function Card({ title, icon: Icon, action, children, className = '', delay = 0 }) {
   return (
     <section
-      className={`card dash-in p-6 transition-shadow duration-200 hover:shadow-md ${className}`}
+      className={`card dash-in p-6 ${className}`}
       style={{ animationDelay: `${delay}ms` }}
     >
       <div className="mb-5 flex items-center justify-between gap-3">
-        <h2 className="flex items-center gap-2 text-base font-bold text-text-primary">
+        <h2 className="flex items-center gap-2 text-base font-extrabold text-text-primary">
           {Icon && <Icon className="h-4 w-4 text-primary" />}
           {title}
         </h2>
@@ -82,8 +67,8 @@ const ViewAll = ({ to, label = 'View all' }) => (
 
 function Empty({ icon: Icon = Inbox, title, hint, to, cta }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border-light bg-bg-light/60 px-4 py-8 text-center">
-      <div className="mb-3 rounded-full bg-primary-light p-3"><Icon className="h-5 w-5 text-primary" /></div>
+    <div className="bt-empty flex flex-col items-center justify-center px-4 py-8 text-center">
+      <div className="bt-icon-bubble mb-3 h-12 w-12 rounded-full"><Icon className="h-5 w-5" /></div>
       <p className="text-sm font-semibold text-text-primary">{title}</p>
       {hint && <p className="mt-1 max-w-xs text-xs text-text-secondary">{hint}</p>}
       {to && <Link to={to} className="btn-primary mt-4 text-sm">{cta}</Link>}
@@ -93,23 +78,23 @@ function Empty({ icon: Icon = Inbox, title, hint, to, cta }) {
 
 function StatTile({ title, value, sub, icon: Icon, tone = 'primary', delay }) {
   const tones = {
-    primary: 'bg-primary-light text-primary',
-    blue: 'bg-blue-50 text-blue-600',
-    green: 'bg-emerald-50 text-emerald-600',
-    red: 'bg-red-50 text-red-600',
+    primary: '',
+    blue: '',
+    green: '',
+    red: '',
   }
   return (
     <div
-      className="card dash-in group p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+      className="card lift dash-in group p-5"
       style={{ animationDelay: `${delay}ms` }}
     >
       <div className="flex items-start justify-between">
         <div className="min-w-0">
           <p className="mb-1 text-sm text-text-secondary">{title}</p>
-          <p className="text-3xl font-bold text-text-primary">{value}</p>
+          <p className="text-3xl font-extrabold tabular-nums text-text-primary">{value}</p>
           <p className="mt-1.5 truncate text-xs text-text-secondary">{sub}</p>
         </div>
-        <div className={`rounded-xl p-3 transition-transform duration-200 group-hover:scale-110 ${tones[tone]}`}>
+        <div className={`bt-icon-bubble h-12 w-12 ${tones[tone]}`}>
           <Icon className="h-5 w-5" />
         </div>
       </div>
@@ -117,10 +102,11 @@ function StatTile({ title, value, sub, icon: Icon, tone = 'primary', delay }) {
   )
 }
 
-function Bar({ value, color = 'bg-primary' }) {
+function Bar({ value, color = '' }) {
+  const tone = color.includes('amber') ? 'alert' : ''
   return (
-    <div className="h-2 flex-1 overflow-hidden rounded-full bg-gray-100">
-      <div className={`h-full rounded-full ${color} transition-all duration-700`} style={{ width: `${value ?? 0}%` }} />
+    <div className="bt-track h-2.5 flex-1">
+      <div className={`bt-fill ${tone}`} style={{ width: `${Math.max(0, Math.min(100, value ?? 0))}%` }} />
     </div>
   )
 }
@@ -132,14 +118,14 @@ function Donut({ items, total }) {
   return (
     <svg viewBox="0 0 140 140" className="h-40 w-40 shrink-0">
       <g transform="rotate(-90 70 70)">
-        <circle cx="70" cy="70" r={r} fill="none" stroke="#f1f0fb" strokeWidth="16" />
+        <circle cx="70" cy="70" r={r} fill="none" stroke="#E9C65E" strokeOpacity="0.35" strokeWidth="16" />
         {items.filter((i) => i.count > 0).map((i) => {
           const len = (i.count / total) * c
           const el = (
             <circle
               key={i.key}
               cx="70" cy="70" r={r} fill="none" strokeWidth="16"
-              stroke={STATUS_COLORS[i.key] || '#9ca3af'}
+              stroke={STATUS_COLORS[i.key] || '#B9A877'}
               strokeDasharray={`${len} ${c - len}`}
               strokeDashoffset={-offset}
               className="transition-all duration-700"
@@ -151,8 +137,8 @@ function Donut({ items, total }) {
           return el
         })}
       </g>
-      <text x="70" y="70" textAnchor="middle" fontSize="26" fontWeight="700" fill="#1a1a1a">{total}</text>
-      <text x="70" y="88" textAnchor="middle" fontSize="10" fill="#666666">tasks</text>
+      <text x="70" y="70" textAnchor="middle" fontSize="26" fontWeight="700" fill="currentColor" className="text-text-primary">{total}</text>
+      <text x="70" y="88" textAnchor="middle" fontSize="10" fill="currentColor" className="text-text-secondary">tasks</text>
     </svg>
   )
 }
@@ -227,7 +213,7 @@ function TaskDistribution({ tasks }) {
           {tasks.by_status.map((s) => (
             <li key={s.key} className="flex items-center justify-between">
               <span className="flex items-center gap-2 text-text-secondary">
-                <span className="h-2.5 w-2.5 rounded-full" style={{ background: STATUS_COLORS[s.key] || '#9ca3af' }} />{s.label}
+                <span className="h-2.5 w-2.5 rounded-full" style={{ background: STATUS_COLORS[s.key] || '#B9A877' }} />{s.label}
               </span>
               <span className="font-semibold text-text-primary">{s.count}</span>
             </li>
@@ -352,7 +338,7 @@ function RecentTasks({ tasks }) {
     <ul className="divide-y divide-border-light">
       {tasks.slice(0, 6).map((t) => (
         <li key={t.id} className="flex items-center gap-3 py-2.5">
-          <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: STATUS_COLORS[t.status] || '#9ca3af' }} title={t.status} />
+          <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: STATUS_COLORS[t.status] || '#B9A877' }} title={t.status} />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium text-text-primary">{t.title}</p>
             <p className="truncate text-xs text-text-secondary">{t.project_name} · {t.suggested_role} · {t.story_points} pt{t.story_points === 1 ? '' : 's'}</p>
@@ -476,23 +462,19 @@ function Dashboard() {
 
   return (
     <div className="mx-auto max-w-7xl">
-      <style>{`
-        @keyframes dashIn { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
-        .dash-in { animation: dashIn .45s ease-out both }
-        @media (prefers-reduced-motion: reduce) { .dash-in { animation: none } }
-      `}</style>
-
-      <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="mb-1 flex items-center gap-2 text-3xl font-bold text-text-primary">
-            {greeting()}{name ? `, ${name.split(' ')[0]}` : ''}
-            <Sparkles className="h-6 w-6 text-primary" />
-          </h1>
-          <p className="text-text-secondary">Your AI-powered SDLC at a glance.</p>
+      <div className="mb-8 flex min-h-[140px] flex-wrap items-center justify-between gap-4 overflow-hidden rounded-2xl border border-blue-400/20 bg-gradient-to-r from-[#07152E] via-[#102A4C] to-[#3155D9] p-6 shadow-xl shadow-blue-900/20">
+        <div className="relative z-10 flex items-center gap-4">
+          <BrandMark size={56} className="hidden shrink-0 drop-shadow-md sm:block" />
+          <div>
+            <h1 className="mb-1 text-3xl font-extrabold text-white">
+              {greeting()}{name ? `, ${name.split(' ')[0]}` : ''}
+            </h1>
+            <p className="text-blue-100">Your AI-powered SDLC at a glance.</p>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="relative z-10 flex items-center gap-3">
           {data && (
-            <span className="hidden items-center gap-1.5 text-xs text-text-secondary sm:flex">
+            <span className="hidden items-center gap-1.5 text-xs text-blue-100 sm:flex">
               <Clock className="h-3.5 w-3.5" /> Updated {timeAgo(data.generated_at)}
             </span>
           )}

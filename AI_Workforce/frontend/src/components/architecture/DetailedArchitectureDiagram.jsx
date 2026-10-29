@@ -23,16 +23,16 @@ const ARC_STEP = 22
 const ROW_RIGHT = 34 // space kept free on the right of every row for same-column arrows
 const LANE_STEP = 6
 
-const METHOD_COLOR = { GET: '#0891b2', POST: '#059669', PUT: '#d97706', PATCH: '#d97706', DELETE: '#dc2626' }
+const METHOD_COLOR = { GET: '#3E9E8F', POST: '#6E9A55', PUT: '#C9697A', PATCH: '#C9697A', DELETE: '#C0463E' }
 const KIND_LABEL = {
   CONTROLLER: 'CTRL', SERVICE: 'SVC', REPOSITORY: 'REPO', MODEL: 'MODEL', MIDDLEWARE: 'MW',
   CLIENT: 'CLIENT', UI_COMPONENT: 'UI', UTILITY: 'UTIL', OTHER: 'MOD',
 }
 const CARDINALITY = { ONE_TO_ONE: '1:1', ONE_TO_MANY: '1:N', MANY_TO_MANY: 'N:N' }
 const EDGE = {
-  relationship: { color: '#8b86a8', width: 1.8, dash: undefined, marker: 'darrow-rel' },
-  module: { color: '#7c3aed', width: 1.3, dash: '5 3', marker: 'darrow-mod' },
-  table: { color: '#059669', width: 1.5, dash: undefined, marker: 'darrow-tbl' },
+  relationship: { color: '#8C7A3F', width: 1.8, dash: undefined, marker: 'darrow-rel' },
+  module: { color: '#7C6A2B', width: 1.3, dash: '5 3', marker: 'darrow-mod' },
+  table: { color: '#6E9A55', width: 1.5, dash: undefined, marker: 'darrow-tbl' },
 }
 
 function rowsFor(container) {
@@ -172,7 +172,7 @@ function Row({ row, box, hover, onHover }) {
   const x = box.x
   const y = box.y + row.y
   if (row.type === 'section') {
-    return <text x={x + 14} y={y + 15} fontSize="10" fontWeight="700" fill="#8b86a8" letterSpacing="0.6">{row.label.toUpperCase()}</text>
+    return <text x={x + 14} y={y + 15} fontSize="10" fontWeight="700" fill="#8C7A3F" letterSpacing="0.6">{row.label.toUpperCase()}</text>
   }
   if (row.type === 'endpoint') {
     const inset = row.indent ? 34 : 14
@@ -183,12 +183,12 @@ function Row({ row, box, hover, onHover }) {
     return (
       <g>
         <title>{`${method} ${route}${summary ? ` — ${summary}` : ''}${auth ? ' (auth required)' : ''}`}</title>
-        <rect x={x + inset} y={y + 2} width={CW - inset - ROW_RIGHT} height={EP_H - 4} rx="5" fill="#f8f7ff" stroke="#ece9ff" />
-        <text x={x + inset + 6} y={y + 16} fontSize="9.5" fontWeight="700" fill={METHOD_COLOR[method] || '#555'}>{method}</text>
-        <text x={textX} y={y + 16} fontSize="10.5" fill="#333" fontFamily="ui-monospace, Menlo, Consolas, monospace">
+        <rect x={x + inset} y={y + 2} width={CW - inset - ROW_RIGHT} height={EP_H - 4} rx="5" fill="#FFF3BF" stroke="#F0D77A" />
+        <text x={x + inset + 6} y={y + 16} fontSize="9.5" fontWeight="700" fill={METHOD_COLOR[method] || '#5C5338'}>{method}</text>
+        <text x={textX} y={y + 16} fontSize="10.5" fill="#34312B" fontFamily="ui-monospace, Menlo, Consolas, monospace">
           {clip(route, room)}
         </text>
-        {auth && <text x={x + CW - ROW_RIGHT - 6} y={y + 16} fontSize="10" textAnchor="end" fill="#8b86a8">🔒</text>}
+        {auth && <text x={x + CW - ROW_RIGHT - 6} y={y + 16} fontSize="10" textAnchor="end" fill="#8C7A3F">🔒</text>}
       </g>
     )
   }
@@ -198,19 +198,19 @@ function Row({ row, box, hover, onHover }) {
   return (
     <g onMouseEnter={() => onHover(row.id)} onMouseLeave={() => onHover(box.id)} style={{ cursor: 'default' }}>
       <title>{isModule ? `${data.name} (${data.kind}) — ${data.description}` : `${data.name} — ${data.description}`}</title>
-      <rect x={x + 10} y={y + 2} width={CW - 10 - ROW_RIGHT} height={row.h - 4} rx="7" fill={active ? '#f3efff' : '#ffffff'} stroke={active ? '#7c3aed' : '#e5e1f5'} />
+      <rect x={x + 10} y={y + 2} width={CW - 10 - ROW_RIGHT} height={row.h - 4} rx="7" fill={active ? '#FFEFA8' : '#FFF9DF'} stroke={active ? '#7C6A2B' : '#EDD36E'} />
       {isModule ? (
         <>
-          <rect x={x + 16} y={y + 9} width="40" height="16" rx="4" fill="#ede9fe" />
-          <text x={x + 36} y={y + 21} fontSize="9" fontWeight="700" textAnchor="middle" fill="#5B2DD8">{KIND_LABEL[data.kind] || 'MOD'}</text>
-          <text x={x + 64} y={y + 21} fontSize="12" fontWeight="600" fill="#1a1a1a">{clip(data.name, 17)}</text>
-          {data.methods > 0 && <text x={x + CW - ROW_RIGHT - 6} y={y + 21} fontSize="9.5" textAnchor="end" fill="#8b86a8">{data.methods}ƒ</text>}
+          <rect x={x + 16} y={y + 9} width="40" height="16" rx="4" fill="#FFE47C" />
+          <text x={x + 36} y={y + 21} fontSize="9" fontWeight="700" textAnchor="middle" fill="#5B4A1A">{KIND_LABEL[data.kind] || 'MOD'}</text>
+          <text x={x + 64} y={y + 21} fontSize="12" fontWeight="600" fill="#34312B">{clip(data.name, 17)}</text>
+          {data.methods > 0 && <text x={x + CW - ROW_RIGHT - 6} y={y + 21} fontSize="9.5" textAnchor="end" fill="#8C7A3F">{data.methods}ƒ</text>}
         </>
       ) : (
         <>
-          <text x={x + 18} y={y + 17} fontSize="12" fontWeight="600" fill="#1a1a1a">{clip(data.name, 24)}</text>
-          <text x={x + CW - ROW_RIGHT - 6} y={y + 17} fontSize="9.5" textAnchor="end" fill="#8b86a8">{data.columns} cols</text>
-          <text x={x + 18} y={y + 29} fontSize="9.5" fill="#666">{data.primary_key.length ? `PK: ${clip(data.primary_key.join(', '), 30)}` : 'no primary key'}</text>
+          <text x={x + 18} y={y + 17} fontSize="12" fontWeight="600" fill="#34312B">{clip(data.name, 24)}</text>
+          <text x={x + CW - ROW_RIGHT - 6} y={y + 17} fontSize="9.5" textAnchor="end" fill="#8C7A3F">{data.columns} cols</text>
+          <text x={x + 18} y={y + 29} fontSize="9.5" fill="#6F6446">{data.primary_key.length ? `PK: ${clip(data.primary_key.join(', '), 30)}` : 'no primary key'}</text>
         </>
       )}
     </g>
@@ -304,13 +304,13 @@ function DetailedArchitectureDiagram({ detailed }) {
             return (
               <g key={box.id} data-container={box.id} onMouseEnter={() => setHover(box.id)} onMouseLeave={() => setHover(null)}>
                 <title>{`${box.label} (${box.type}, ${box.grounding})`}</title>
-                <rect x={box.x} y={box.y} width={CW} height={box.height} rx="12" fill={lit ? '#fbfaff' : '#ffffff'} stroke={color} strokeWidth="2" strokeDasharray={certain ? undefined : '6 4'} />
+                <rect x={box.x} y={box.y} width={CW} height={box.height} rx="12" fill={lit ? '#FFF6CF' : '#FFF9DF'} stroke={color} strokeWidth="2" strokeDasharray={certain ? undefined : '6 4'} />
                 <rect x={box.x} y={box.y} width="7" height={box.height} rx="3" fill={color} />
-                <text x={box.x + 20} y={box.y + 24} fontSize="13.5" fontWeight="700" fill="#1a1a1a">{clip(box.label, 26)}</text>
-                <text x={box.x + 20} y={box.y + 42} fontSize="10.5" fill="#666666">
+                <text x={box.x + 20} y={box.y + 24} fontSize="13.5" fontWeight="700" fill="#34312B">{clip(box.label, 26)}</text>
+                <text x={box.x + 20} y={box.y + 42} fontSize="10.5" fill="#6F6446">
                   {box.id === 'DATA_MODEL' ? styleFor(box.type).label : `${box.id} · ${styleFor(box.type).label}`}{box.technology ? ` · ${clip(box.technology, 22)}` : ''}
                 </text>
-                {box.rows.length > 0 && <line x1={box.x + 14} y1={box.y + HEADER_H - 2} x2={box.x + CW - 14} y2={box.y + HEADER_H - 2} stroke="#eeeaf8" />}
+                {box.rows.length > 0 && <line x1={box.x + 14} y1={box.y + HEADER_H - 2} x2={box.x + CW - 14} y2={box.y + HEADER_H - 2} stroke="#EFD97F" />}
                 {box.rows.map((row, index) => <Row key={`${row.type}-${row.id || index}`} row={row} box={box} hover={hover} onHover={setHover} />)}
               </g>
             )
@@ -333,8 +333,8 @@ function DetailedArchitectureDiagram({ detailed }) {
             return (
               <g key={`label-${edge.key}`} opacity={touches(edge) ? 1 : 0.12}>
                 <title>{edge.tip}</title>
-                <rect x={lx - label.length * 3.1 - 5} y={ly - 9} width={label.length * 6.2 + 10} height="17" rx="4" fill="#ffffff" stroke={edge.kind === 'table' ? '#bbf7d0' : '#e5e0ff'} />
-                <text x={lx} y={ly + 3.5} textAnchor="middle" fontSize="10" fill="#555">{label}</text>
+                <rect x={lx - label.length * 3.1 - 5} y={ly - 9} width={label.length * 6.2 + 10} height="17" rx="4" fill="#FFF9DF" stroke={edge.kind === 'table' ? '#CFE3B4' : '#E9C65E'} />
+                <text x={lx} y={ly + 3.5} textAnchor="middle" fontSize="10" fill="#5C5338">{label}</text>
               </g>
             )
           })}

@@ -1,16 +1,16 @@
 // Colours and labels shared by the overview and detailed architecture diagrams.
 export const TYPE_STYLE = {
-  FRONTEND: { color: '#5B2DD8', label: 'Frontend' },
-  GATEWAY: { color: '#7c3aed', label: 'Gateway' },
-  API: { color: '#2563eb', label: 'API' },
-  SERVICE: { color: '#0891b2', label: 'Service' },
-  AI_SERVICE: { color: '#c026d3', label: 'AI service' },
-  QUEUE: { color: '#d97706', label: 'Queue' },
-  CACHE: { color: '#ea580c', label: 'Cache' },
-  DATABASE: { color: '#059669', label: 'Database' },
-  STORAGE: { color: '#16a34a', label: 'Storage' },
-  EXTERNAL_SYSTEM: { color: '#64748b', label: 'External system' },
-  OTHER: { color: '#6b7280', label: 'Other' },
+  FRONTEND: { color: '#5B4A1A', label: 'Frontend' },
+  GATEWAY: { color: '#7C6A2B', label: 'Gateway' },
+  API: { color: '#5B8FB9', label: 'API' },
+  SERVICE: { color: '#3E9E8F', label: 'Service' },
+  AI_SERVICE: { color: '#E0B83F', label: 'AI service' },
+  QUEUE: { color: '#C9697A', label: 'Queue' },
+  CACHE: { color: '#B65A8A', label: 'Cache' },
+  DATABASE: { color: '#6E9A55', label: 'Database' },
+  STORAGE: { color: '#8DB36A', label: 'Storage' },
+  EXTERNAL_SYSTEM: { color: '#8C8672', label: 'External system' },
+  OTHER: { color: '#8C8672', label: 'Other' },
 }
 
 export const styleFor = (type) => TYPE_STYLE[type] || TYPE_STYLE.OTHER

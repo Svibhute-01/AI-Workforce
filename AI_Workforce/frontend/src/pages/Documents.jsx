@@ -62,7 +62,7 @@ function Documents() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-8 gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
         <div>
           <h1 className="text-3xl font-bold text-text-primary mb-2">Documents</h1>
           <p className="text-text-secondary">Upload and process an SRS for Requirements Analyst AI</p>

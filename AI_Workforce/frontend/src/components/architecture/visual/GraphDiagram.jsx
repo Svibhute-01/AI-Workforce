@@ -13,9 +13,9 @@ import { EDGE_STYLE, KIND_BADGE, toneColor } from './visualTheme'
 const MONO = 'ui-monospace, Menlo, Consolas, monospace'
 const MARGIN = 28
 const TAGS = {
-  PK: { bg: '#fef3c7', fg: '#b45309' },
-  FK: { bg: '#dbeafe', fg: '#1d4ed8' },
-  UQ: { bg: '#f3f4f6', fg: '#4b5563' },
+  PK: { bg: '#FFE47C', fg: '#5B4A1A' },
+  FK: { bg: '#FBE0E4', fg: '#9C3F52' },
+  UQ: { bg: '#FFF0AD', fg: '#6F6446' },
 }
 const tint = (color, alpha = '14') => `${color}${alpha}`
 const fits = (width, size, mono = false) => Math.max(6, Math.floor(width / (size * (mono ? 0.64 : 0.58))))
@@ -23,7 +23,7 @@ const dashed = (node) => (node.grounding && node.grounding !== 'EXPLICIT' && nod
 
 function Tag({ text, x, y }) {
   const style = TAGS[text]
-  if (!style) return <text x={x} y={y + 10} fontSize="10" fill="#8b86a8">{text}</text>
+  if (!style) return <text x={x} y={y + 10} fontSize="10" fill="#8C7A3F">{text}</text>
   return (
     <g>
       <rect x={x} y={y} width="22" height="13" rx="3" fill={style.bg} />
@@ -43,11 +43,11 @@ function Rows({ rows, x, y, width, rowHeight = 17 }) {
     return (
       <g key={`${i}-${row.text}`}>
         {tagged && <Tag text={row.tag} x={x} y={top + 1} />}
-        <text x={left} y={top + 12} fontSize={size} fontFamily={row.mono ? MONO : undefined} fill={row.muted ? '#8b86a8' : '#333333'}>
+        <text x={left} y={top + 12} fontSize={size} fontFamily={row.mono ? MONO : undefined} fill={row.muted ? '#8C7A3F' : '#34312B'}>
           {clip(row.text, fits(room, size, row.mono))}
         </text>
-        {right && <text x={x + width} y={top + 12} fontSize="9.5" textAnchor="end" fill="#8b86a8">{right}</text>}
-        {row.tag && !tagged && <text x={x + width} y={top + 12} fontSize="10" textAnchor="end" fill="#8b86a8">{row.tag}</text>}
+        {right && <text x={x + width} y={top + 12} fontSize="9.5" textAnchor="end" fill="#8C7A3F">{right}</text>}
+        {row.tag && !tagged && <text x={x + width} y={top + 12} fontSize="10" textAnchor="end" fill="#8C7A3F">{row.tag}</text>}
       </g>
     )
   })
@@ -57,8 +57,8 @@ function Title({ node, x, y, width, anchor = 'start', size = 13, subSize = 10.5 
   const cx = anchor === 'middle' ? x + width / 2 : x
   return (
     <>
-      <text x={cx} y={y} fontSize={size} fontWeight="700" textAnchor={anchor} fill="#1a1a1a">{clip(node.title, fits(width, size))}</text>
-      {node.subtitle && <text x={cx} y={y + size + 3} fontSize={subSize} textAnchor={anchor} fill="#666666">{clip(node.subtitle, fits(width, subSize))}</text>}
+      <text x={cx} y={y} fontSize={size} fontWeight="700" textAnchor={anchor} fill="#34312B">{clip(node.title, fits(width, size))}</text>
+      {node.subtitle && <text x={cx} y={y + size + 3} fontSize={subSize} textAnchor={anchor} fill="#6F6446">{clip(node.subtitle, fits(width, subSize))}</text>}
     </>
   )
 }
@@ -69,15 +69,15 @@ function Shape({ node, box }) {
   const dash = dashed(node)
   const rows = node.rows || []
   const cx = x + w / 2
-  const stroke = { stroke: c, strokeWidth: 2, strokeDasharray: dash, fill: '#ffffff' }
+  const stroke = { stroke: c, strokeWidth: 2, strokeDasharray: dash, fill: '#FFF9DF' }
 
   switch (node.shape) {
     case 'actor':
       return (
         <g>
-          <circle cx={cx} cy={y + 20} r="11" fill="#ffffff" stroke={c} strokeWidth="2.2" />
+          <circle cx={cx} cy={y + 20} r="11" fill="#FFF9DF" stroke={c} strokeWidth="2.2" />
           <path d={`M ${cx} ${y + 31} L ${cx} ${y + 56} M ${cx - 17} ${y + 41} L ${cx + 17} ${y + 41} M ${cx} ${y + 56} L ${cx - 13} ${y + 74} M ${cx} ${y + 56} L ${cx + 13} ${y + 74}`} stroke={c} strokeWidth="2.2" fill="none" strokeLinecap="round" />
-          <text x={cx} y={y + 91} fontSize="12.5" fontWeight="700" textAnchor="middle" fill="#1a1a1a">{clip(node.title, fits(w, 12.5))}</text>
+          <text x={cx} y={y + 91} fontSize="12.5" fontWeight="700" textAnchor="middle" fill="#34312B">{clip(node.title, fits(w, 12.5))}</text>
         </g>
       )
     case 'system':
@@ -159,12 +159,12 @@ function Shape({ node, box }) {
       const badge = Math.max(40, method.length * 7 + 14)
       return (
         <g>
-          <rect x={x} y={y} width={w} height={h} rx="8" fill="#ffffff" stroke={c} strokeWidth="1.8" />
+          <rect x={x} y={y} width={w} height={h} rx="8" fill="#FFF9DF" stroke={c} strokeWidth="1.8" />
           <rect x={x} y={y} width={badge} height={h} rx="8" fill={c} />
           <rect x={x + badge - 8} y={y} width="8" height={h} fill={c} />
-          <text x={x + badge / 2} y={y + (node.subtitle ? 19 : h / 2 + 4)} fontSize="10.5" fontWeight="700" textAnchor="middle" fill="#ffffff">{method}</text>
-          <text x={x + badge + 8} y={y + (node.subtitle ? 19 : h / 2 + 4)} fontSize="11" fontFamily={MONO} fill="#1a1a1a">{clip(route, fits(w - badge - (node.tag ? 34 : 18), 11, true))}</text>
-          {node.subtitle && <text x={x + badge + 8} y={y + 36} fontSize="10" fill="#666666">{clip(node.subtitle, fits(w - badge - 16, 10))}</text>}
+          <text x={x + badge / 2} y={y + (node.subtitle ? 19 : h / 2 + 4)} fontSize="10.5" fontWeight="700" textAnchor="middle" fill="#FFF9DF">{method}</text>
+          <text x={x + badge + 8} y={y + (node.subtitle ? 19 : h / 2 + 4)} fontSize="11" fontFamily={MONO} fill="#34312B">{clip(route, fits(w - badge - (node.tag ? 34 : 18), 11, true))}</text>
+          {node.subtitle && <text x={x + badge + 8} y={y + 36} fontSize="10" fill="#6F6446">{clip(node.subtitle, fits(w - badge - 16, 10))}</text>}
           {node.tag && <text x={x + w - 10} y={y + 19} fontSize="11" textAnchor="end">{node.tag}</text>}
         </g>
       )
@@ -172,9 +172,9 @@ function Shape({ node, box }) {
     case 'table': {
       return (
         <g>
-          <rect x={x} y={y} width={w} height={h} rx="8" fill="#ffffff" stroke={c} strokeWidth="1.8" />
+          <rect x={x} y={y} width={w} height={h} rx="8" fill="#FFF9DF" stroke={c} strokeWidth="1.8" />
           <path d={`M ${x} ${y + 30} L ${x} ${y + 8} Q ${x} ${y} ${x + 8} ${y} L ${x + w - 8} ${y} Q ${x + w} ${y} ${x + w} ${y + 8} L ${x + w} ${y + 30} Z`} fill={c} />
-          <text x={x + 12} y={y + 20} fontSize="12.5" fontWeight="700" fill="#ffffff" fontFamily={MONO}>{clip(node.title, fits(w - 24, 12.5))}</text>
+          <text x={x + 12} y={y + 20} fontSize="12.5" fontWeight="700" fill="#FFF9DF" fontFamily={MONO}>{clip(node.title, fits(w - 24, 12.5))}</text>
           <Rows rows={rows} x={x + 12} y={y + 38} width={w - 24} />
         </g>
       )
@@ -197,8 +197,8 @@ function Shape({ node, box }) {
         <g opacity={node.ghost ? 0.55 : 1}>
           <rect x={x} y={y} width={w} height={h} rx="8" {...stroke} strokeWidth="1.8" strokeDasharray={node.shape === 'interface' ? '5 3' : dash} />
           <path d={`M ${x} ${y + head} L ${x} ${y + 8} Q ${x} ${y} ${x + 8} ${y} L ${x + w - 8} ${y} Q ${x + w} ${y} ${x + w} ${y + 8} L ${x + w} ${y + head} Z`} fill={tint(c, '1c')} />
-          <text x={x + w / 2} y={y + 16} fontSize="9.5" textAnchor="middle" fill="#666666">{clip(node.subtitle, fits(w - 16, 9.5))}</text>
-          <text x={x + w / 2} y={y + 33} fontSize="12.5" fontWeight="700" textAnchor="middle" fill="#1a1a1a">{clip(node.title, fits(w - 16, 12.5))}</text>
+          <text x={x + w / 2} y={y + 16} fontSize="9.5" textAnchor="middle" fill="#6F6446">{clip(node.subtitle, fits(w - 16, 9.5))}</text>
+          <text x={x + w / 2} y={y + 33} fontSize="12.5" fontWeight="700" textAnchor="middle" fill="#34312B">{clip(node.title, fits(w - 16, 12.5))}</text>
           {rows.length > 0 && <line x1={x} y1={y + head} x2={x + w} y2={y + head} stroke={c} strokeOpacity="0.5" />}
           <Rows rows={rows} x={x + 10} y={y + head + 6} width={w - 20} />
         </g>
@@ -219,7 +219,7 @@ function Markers() {
       {arrow('mk-flow', EDGE_STYLE.flow.color)}
       {arrow('mk-dep', EDGE_STYLE.dep.color)}
       <marker id="mk-hollow" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="13" markerHeight="13" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
-        <path d="M 1 1 L 11 6 L 1 11 z" fill="#ffffff" stroke={EDGE_STYLE.impl.color} strokeWidth="1.4" />
+        <path d="M 1 1 L 11 6 L 1 11 z" fill="#FFF9DF" stroke={EDGE_STYLE.impl.color} strokeWidth="1.4" />
       </marker>
       <marker id="mk-one" viewBox="0 0 14 14" refX="13" refY="7" markerWidth="14" markerHeight="14" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
         <path d="M 6 1 L 6 13 M 10 1 L 10 13" stroke={EDGE_STYLE.fk.color} strokeWidth="1.6" fill="none" />
@@ -283,10 +283,10 @@ function Graph({ model, layout, routes, selected, highlightIds, onSelect }) {
         const lit = activeId === id || selectedKey === (group.ref ? `${group.ref.type}:${group.ref.id}` : null)
         return (
           <g key={id} data-group={id} onMouseEnter={() => setHover(id)} onMouseLeave={() => setHover(null)} opacity={activeId && !activeIds.has(id) && !neighbours.has(id) && !model.nodes.some((n) => n.group === id && neighbours.has(n.id)) ? 0.5 : 1}>
-            <rect x={group.x} y={group.y} width={group.w} height={group.h} rx="16" fill={tint(c, '08')} stroke={lit ? '#5B2DD8' : c} strokeWidth={lit ? 2.6 : 1.6} strokeDasharray="8 5" />
+            <rect x={group.x} y={group.y} width={group.w} height={group.h} rx="16" fill={tint(c, '08')} stroke={lit ? '#5B4A1A' : c} strokeWidth={lit ? 2.6 : 1.6} strokeDasharray="8 5" />
             <g onClick={() => select(group.ref)} style={{ cursor: group.ref ? 'pointer' : 'default' }}>
-              <text x={group.x + 16} y={group.y + 20} fontSize="12.5" fontWeight="700" fill="#1a1a1a">{clip(group.label, fits(group.w - 32, 12.5))}</text>
-              {group.sublabel && <text x={group.x + 16} y={group.y + 33} fontSize="10" fill="#666666">{clip(group.sublabel, fits(group.w - 32, 10))}</text>}
+              <text x={group.x + 16} y={group.y + 20} fontSize="12.5" fontWeight="700" fill="#34312B">{clip(group.label, fits(group.w - 32, 12.5))}</text>
+              {group.sublabel && <text x={group.x + 16} y={group.y + 33} fontSize="10" fill="#6F6446">{clip(group.sublabel, fits(group.w - 32, 10))}</text>}
             </g>
           </g>
         )
@@ -331,7 +331,7 @@ function Graph({ model, layout, routes, selected, highlightIds, onSelect }) {
           >
             <title>{node.tooltip || node.title}</title>
             {(isSelected || isMarked) && (
-              <rect x={box.x - 5} y={box.y - 5} width={box.w + 10} height={box.h + 10} rx="14" fill="none" stroke={isSelected ? '#5B2DD8' : '#f59e0b'} strokeWidth={isSelected ? 2.8 : 2.2} strokeDasharray={isSelected ? undefined : '5 3'} />
+              <rect x={box.x - 5} y={box.y - 5} width={box.w + 10} height={box.h + 10} rx="14" fill="none" stroke={isSelected ? '#5B4A1A' : '#B65A8A'} strokeWidth={isSelected ? 2.8 : 2.2} strokeDasharray={isSelected ? undefined : '5 3'} />
             )}
             <Shape node={node} box={box} />
           </g>
@@ -345,8 +345,8 @@ function Graph({ model, layout, routes, selected, highlightIds, onSelect }) {
         return (
           <g key={`label-${edge.id}`} opacity={live ? 1 : dimTo} pointerEvents="none">
             <title>{edge.tooltip || edge.label}</title>
-            <rect x={lx - width / 2} y={ly - 9} width={width} height="18" rx="9" fill="#ffffff" stroke={flow ? EDGE_STYLE.flow.color : edge.kind === 'fk' ? '#a7f3d0' : '#e5e0ff'} />
-            <text x={lx} y={ly + 4} fontSize="10.5" fontWeight={flow ? 600 : 500} textAnchor="middle" fill="#444444">{edge.label}</text>
+            <rect x={lx - width / 2} y={ly - 9} width={width} height="18" rx="9" fill="#FFF9DF" stroke={flow ? EDGE_STYLE.flow.color : edge.kind === 'fk' ? '#CFE3B4' : '#E9C65E'} />
+            <text x={lx} y={ly + 4} fontSize="10.5" fontWeight={flow ? 600 : 500} textAnchor="middle" fill="#4A4331">{edge.label}</text>
           </g>
         )
       })}

@@ -142,7 +142,7 @@ function DiagramCanvas({ width, height, children, label, resetKey, heightClass =
             <svg width="100%" height="100%" role="img" aria-label={label}>
               <defs>
                 <pattern id="canvas-dots" width="22" height="22" patternUnits="userSpaceOnUse">
-                  <circle cx="1.5" cy="1.5" r="1" fill="#e5e0ff" />
+                  <circle cx="1.5" cy="1.5" r="1" fill="#E9C65E" />
                 </pattern>
               </defs>
               <rect width="100%" height="100%" fill="url(#canvas-dots)" />
